@@ -2,5 +2,5 @@ flask
 flask-cors
 markdown
 requests
-google
+google-genai
 python-dotenv
