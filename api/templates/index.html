@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>ADA Voice Assistant</title>
+<style>
+  body{font-family: Arial, Helvetica, sans-serif; margin:20px; background:#f5f7fb}
+  .container{max-width:900px; margin:0 auto;}
+  #chat{background:#fff;border:1px solid #ddd;padding:12px;height:360px;overflow:auto;}
+  .msg-user{color:#0b6; margin:6px 0;}
+  .msg-ai{color:#036;margin:6px 0;}
+  #controls{margin-top:10px;}
+  textarea{width:100%;height:70px;font-size:1rem;padding:8px;}
+  button{padding:8px 12px;margin-right:8px;font-size:1rem;}
+  #response-html{margin-top:12px;padding:10px;background:#fff;border:1px solid #eee;}
+</style>
+</head>
+<body>
+<div class="container">
+  <h2>ADA Voice Assistant</h2>
+  <div id="chat" aria-live="polite"></div>
+
+  <div id="controls">
+    <textarea id="prompt" placeholder="質問を入力..."></textarea><br>
+    <button id="send">送信</button>
+    <button id="repeat" disabled>もう一度聞く</button>
+  </div>
+
+  <div id="response-html"></div>
+  <audio id="audio" controls style="width:100%; margin-top:12px;"></audio>
+</div>
+
+<script>
+let lastPlain = "";
+const chat = document.getElementById('chat');
+const respHtml = document.getElementById('response-html');
+const audioEl = document.getElementById('audio');
+const sendBtn = document.getElementById('send');
+const repeatBtn = document.getElementById('repeat');
+
+function appendChat(cls, text){
+  const d = document.createElement('div');
+  d.className = cls;
+  d.innerText = text;
+  chat.appendChild(d);
+  chat.scrollTop = chat.scrollHeight;
+}
+
+sendBtn.addEventListener('click', async () => {
+  const prompt = document.getElementById('prompt').value.trim();
+  if(!prompt) return;
+  appendChat('msg-user', "You: " + prompt);
+  sendBtn.disabled = true;
+  try {
+    const res = await fetch('/api/chat', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({prompt})
+    });
+    const data = await res.json();
+    if (data.error) {
+      appendChat('msg-ai', 'Error: ' + data.error);
+      respHtml.innerText = data.error;
+      return;
+    }
+    // 表示（HTML）と音声用プレーンテキスト（plain）を受け取る
+    if (data.html) {
+      respHtml.innerHTML = data.html;
+    } else {
+      respHtml.innerText = data.plain || '(no response)';
+    }
+    lastPlain = data.plain || "";
+    appendChat('msg-ai', 'AI: ' + (data.plain || '(no text)'));
+    if (lastPlain) {
+      repeatBtn.disabled = false;
+      await playVoice(lastPlain);
+    } else {
+      repeatBtn.disabled = true;
+    }
+  } catch (e) {
+    appendChat('msg-ai', '通信エラー: ' + e.message);
+  } finally {
+    sendBtn.disabled = false;
+  }
+});
+
+repeatBtn.addEventListener('click', async () => {
+  if (!lastPlain) return;
+  await playVoice(lastPlain);
+});
+
+async function playVoice(plainText) {
+  try {
+    const res = await fetch('/api/tts', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({text: plainText})
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(()=>({error:'Unknown'}));
+      appendChat('msg-ai','TTS エラー: ' + (err.error||res.status));
+      return;
+    }
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    audioEl.src = url;
+    await audioEl.play();
+  } catch (e) {
+    appendChat('msg-ai', 'TTS通信エラー: ' + e.message);
+  }
+}
+</script>
+</body>
+</html>

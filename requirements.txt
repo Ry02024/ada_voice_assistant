@@ -1,0 +1,6 @@
+flask
+flask-cors
+markdown
+requests
+google
+python-dotenv
