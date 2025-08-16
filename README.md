@@ -4,89 +4,90 @@
 
 ## 主な機能
 
-  * **AI対話機能**: Google Gemini APIを利用した高度な対話AI。
-  * **高品質なAI音声合成**: Fish Audio APIによる自然な日本語音声生成。
-  * **リアルタイム通信**: `Flask-SocketIO`を用いた、ウェブブラウザとサーバー間の双方向リアルタイム通信。
-  * **シンプルで軽量なフロントエンド**: HTML, CSS, JavaScriptのみで構築されたウェブインターフェース。
-  * **自動デプロイ**: GitHub Actionsを利用したGitHub Pagesへの自動デプロイ。
+*   **AI対話機能**: Google Gemini APIを利用した高度な対話AI。
+*   **高品質なAI音声合成**: Fish Audio APIによる自然な日本語音声生成。
+*   **シンプルなWebインターフェース**: HTML, CSS, JavaScriptのみで構築された、軽量なシングルページのウェブインターフェース。
+*   **Vercelへのデプロイ対応**: サーバーレスアーキテクチャで簡単にデプロイ可能。
 
 ## 技術スタック
 
-  * **フロントエンド**:
-      * HTML
-      * CSS
-      * JavaScript (Vanilla JS)
-  * **バックエンド**:
-      * Python 3.x
-      * Flask
-      * Flask-SocketIO
-  * **API**:
-      * Google Gemini API
-      * Fish Audio API
+*   **フロントエンド**:
+    *   HTML
+    *   CSS
+    *   JavaScript (Vanilla JS)
+*   **バックエンド**:
+    *   Python 3.x
+    *   Flask
+*   **API**:
+    *   Google Gemini API
+    *   Fish Audio API
+*   **デプロイメント**:
+    *   Vercel
 
 ## ファイル構造
 
 ```
 .
-├── .github/                # GitHub Actionsの設定ファイル
-│   └── workflows/
-│       └── deploy.yml      # GitHub Pagesへの自動デプロイ設定
-├── backend/                # バックエンドのソースコード
-│   ├── app.py              # Flaskサーバーのメインファイル
-│   └── requirements.txt    # 必要なPythonライブラリの一覧
-├── docs/                   # GitHub Pagesで公開されるウェブサイトのファイル
-│   └── index.html          # ウェブサイトの本体（HTML/CSS/JSを含む）
+├── api/
+│   ├── index.py              # Flaskサーバーのメインファイル
+│   └── templates/
+│       └── index.html      # ウェブサイトの本体（HTML/CSS/JSを含む）
+├── requirements.txt        # 必要なPythonライブラリの一覧
+├── vercel.json             # Vercelデプロイ設定ファイル
 └── README.md               # このドキュメント
 ```
 
-## セットアップと実行方法
+## セットアップとローカルでの実行方法
 
-### 1\. リポジトリのクローン
+### 1. リポジトリのクローン
 
 ```bash
 git clone https://github.com/Ry02024/ada_voice_assistant.git
 cd ada_voice_assistant
 ```
 
-### 2\. バックエンドのセットアップ
+### 2. Python仮想環境とライブラリのインストール
 
-`backend`ディレクトリに移動し、Pythonの仮想環境を作成・有効化して、必要なライブラリをインストールします。
+Pythonの仮想環境を作成・有効化して、必要なライブラリをインストールします。
 
 ```bash
-cd backend
 python -m venv venv
 source venv/bin/activate  # Windowsの場合は venv\Scripts\activate
 pip install -r requirements.txt
 ```
 
-### 3\. 環境変数の設定
+### 3. 環境変数の設定
 
-APIキーを安全に管理するため、`.env`ファイルを作成し、以下の情報を記述します。
+APIキーを安全に管理するため、プロジェクトのルートディレクトリに`.env`ファイルを作成し、以下の情報を記述します。
 
 ```
 GOOGLE_API_KEY="あなたのGoogle Gemini APIキー"
-FISH_AUDIO_API_KEY="あなたのFish Audio APIキー"
+FISH_AUDIO_TOKEN="あなたのFish Audio APIトークン"
+FISH_AUDIO_VOICE_ID="あなたのFish Audioの音声ID"
 ```
 
-### 4\. アプリケーションの実行
+### 4. アプリケーションの実行
 
 バックエンドサーバーを起動します。
 
 ```bash
-python app.py
+python api/index.py
 ```
 
-サーバーが起動したら、ウェブブラウザで`http://127.0.0.1:5000`にアクセスしてテストできます。
+サーバーが起動したら、コンソールに表示されるURL（通常は `http://127.0.0.1:5000`）にウェブブラウザでアクセスして動作を確認できます。
 
 ## デプロイ
 
-このプロジェクトはGitHub Pagesを利用しており、`docs/`ディレクトリの内容が公開されます。
-`deploy.yml`ファイルが、以下のプロセスを自動化しています。
+このプロジェクトはVercelへのデプロイを前提として構成されています。
 
-1.  リポジトリへのプッシュを検知。
-2.  `docs/`ディレクトリの内容をビルド。
-3.  GitHub Pagesへデプロイ。
+1.  Vercel CLIをインストールします。
+2.  `vercel login`でログインします。
+3.  プロジェクトのルートで`vercel`コマンドを実行してデプロイします。
 
-APIキーは、GitHubの**Secrets**に`GOOGLE_API_KEY`と`FISH_AUDIO_API_KEY`として設定することで、安全に扱われます。
+APIキーなどの環境変数は、Vercelプロジェクトの「Settings」>「Environment Variables」で設定してください。
 
------
+```
+GOOGLE_API_KEY
+FISH_AUDIO_TOKEN
+FISH_AUDIO_VOICE_ID
+```
