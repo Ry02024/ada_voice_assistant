@@ -4,3 +4,5 @@ markdown
 requests
 google-genai
 python-dotenv
+python-docx
+pypdf2

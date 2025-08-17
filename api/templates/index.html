@@ -1,115 +1,403 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="ja">
 <head>
-<meta charset="utf-8" />
-<meta name="viewport" content="width=device-width,initial-scale=1"/>
-<title>ADA Voice Assistant</title>
-<style>
-  body{font-family: Arial, Helvetica, sans-serif; margin:20px; background:#f5f7fb}
-  .container{max-width:900px; margin:0 auto;}
-  #chat{background:#fff;border:1px solid #ddd;padding:12px;height:360px;overflow:auto;}
-  .msg-user{color:#0b6; margin:6px 0;}
-  .msg-ai{color:#036;margin:6px 0;}
-  #controls{margin-top:10px;}
-  textarea{width:100%;height:70px;font-size:1rem;padding:8px;}
-  button{padding:8px 12px;margin-right:8px;font-size:1rem;}
-  #response-html{margin-top:12px;padding:10px;background:#fff;border:1px solid #eee;}
-</style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI音声チャット</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #f0f2f5;
+            color: #333;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+        }
+        .chat-container {
+            width: 100%;
+            max-width: 600px;
+            background-color: #fff;
+            border-radius: 8px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            height: 80vh;
+        }
+        header {
+            background-color: #4CAF50;
+            color: white;
+            padding: 15px;
+            text-align: center;
+            font-size: 1.2em;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .chat-box {
+            flex-grow: 1;
+            padding: 20px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+        .message {
+            max-width: 80%;
+            padding: 10px 15px;
+            border-radius: 20px;
+            word-wrap: break-word;
+        }
+        .message.user {
+            align-self: flex-end;
+            background-color: #dcf8c6;
+        }
+        .message.bot {
+            align-self: flex-start;
+            background-color: #e5e5ea;
+        }
+        .input-area {
+            display: flex;
+            padding: 15px;
+            border-top: 1px solid #ddd;
+        }
+        input[type="text"] {
+            flex-grow: 1;
+            padding: 10px;
+            border-radius: 20px;
+            border: 1px solid #ddd;
+            outline: none;
+        }
+        button {
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            padding: 10px 15px;
+            margin-left: 10px;
+            border-radius: 20px;
+            cursor: pointer;
+            outline: none;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: background-color 0.3s;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+        button:disabled {
+            background-color: #ccc;
+            cursor: not-allowed;
+        }
+        .spinner {
+            border: 4px solid rgba(0, 0, 0, 0.1);
+            border-top: 4px solid #4CAF50;
+            border-radius: 50%;
+            width: 20px;
+            height: 20px;
+            animation: spin 1s linear infinite;
+            margin-left: 10px;
+            display: none;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .persona-control {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+        .persona-select {
+            padding: 8px;
+            border-radius: 5px;
+            border: 1px solid #ddd;
+        }
+        .add-persona-btn {
+            background-color: #2196F3;
+        }
+        .add-persona-btn:hover {
+            background-color: #1a71c2;
+        }
+
+        /* Modal Styles */
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            overflow: auto;
+            background-color: rgba(0,0,0,0.4);
+            padding-top: 60px;
+        }
+        .modal-content {
+            background-color: #fefefe;
+            margin: 5% auto;
+            padding: 20px;
+            border: 1px solid #888;
+            width: 80%;
+            max-width: 500px;
+            border-radius: 8px;
+        }
+        .close {
+            color: #aaa;
+            float: right;
+            font-size: 28px;
+            font-weight: bold;
+        }
+        .close:hover,
+        .close:focus {
+            color: black;
+            text-decoration: none;
+            cursor: pointer;
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        .form-group input, .form-group textarea {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+    </style>
 </head>
 <body>
-<div class="container">
-  <h2>ADA Voice Assistant</h2>
-  <div id="chat" aria-live="polite"></div>
 
-  <div id="controls">
-    <textarea id="prompt" placeholder="質問を入力..."></textarea><br>
-    <button id="send">送信</button>
-    <button id="repeat" disabled>もう一度聞く</button>
-  </div>
+<div class="chat-container">
+    <header>
+        AI音声チャット
+        <div class="persona-control">
+            <select id="persona-select" class="persona-select"></select>
+            <button id="add-persona-btn" class="add-persona-btn">ペルソナ追加</button>
+        </div>
+    </header>
+    <div class="chat-box" id="chat-box"></div>
+    <div class="input-area">
+        <input type="text" id="user-input" placeholder="メッセージを入力...">
+        <button id="send-btn">送信</button>
+        <div id="loading-spinner" class="spinner"></div>
+    </div>
+</div>
 
-  <div id="response-html"></div>
-  <audio id="audio" controls style="width:100%; margin-top:12px;"></audio>
+<!-- Modal for adding personality -->
+<div id="add-persona-modal" class="modal">
+    <div class="modal-content">
+        <span class="close">&times;</span>
+        <h2>新しいペルソナを追加</h2>
+        <form id="add-persona-form">
+            <div class="form-group">
+                <label for="persona-name">ペルソナ名 (任意)</label>
+                <!-- 修正: placeholderを追加 -->
+                <input type="text" id="persona-name" placeholder="例: 空欄の場合、Geminiが自動で命名します。">
+            </div>
+            <div class="form-group">
+                <label for="persona-text">ペルソナ設定テキスト</label>
+                <textarea id="persona-text" rows="5" placeholder="例: あなたは歴史の専門家です。"></textarea>
+            </div>
+            <div style="text-align: center; margin: 15px 0;">または</div>
+            <div class="form-group">
+                <label for="persona-file">ファイルからアップロード (txt, docx, pdf, csv)</label>
+                <input type="file" id="persona-file">
+            </div>
+            <button type="submit">保存</button>
+        </form>
+    </div>
 </div>
 
 <script>
-let lastPlain = "";
-const chat = document.getElementById('chat');
-const respHtml = document.getElementById('response-html');
-const audioEl = document.getElementById('audio');
-const sendBtn = document.getElementById('send');
-const repeatBtn = document.getElementById('repeat');
+    const chatBox = document.getElementById('chat-box');
+    const userInput = document.getElementById('user-input');
+    const sendBtn = document.getElementById('send-btn');
+    const loadingSpinner = document.getElementById('loading-spinner');
+    const personaSelect = document.getElementById('persona-select');
+    const addPersonaBtn = document.getElementById('add-persona-btn');
+    const addPersonaModal = document.getElementById('add-persona-modal');
+    const closeModalBtn = document.querySelector('.modal .close');
+    const addPersonaForm = document.getElementById('add-persona-form');
+    const personaNameInput = document.getElementById('persona-name');
+    const personaTextInput = document.getElementById('persona-text');
+    const personaFileInput = document.getElementById('persona-file');
+    
+    // UIを初期化
+    async function initializeUI() {
+        await loadPersonalities();
+        addMessage('bot', '何か話しかけてください！');
+    }
 
-function appendChat(cls, text){
-  const d = document.createElement('div');
-  d.className = cls;
-  d.innerText = text;
-  chat.appendChild(d);
-  chat.scrollTop = chat.scrollHeight;
-}
+    async function loadPersonalities() {
+        try {
+            const baseUrl = window.location.origin;
+            const response = await fetch(`${baseUrl}/api/personalities`);
+            const data = await response.json();
+            const personalities = data.personalities;
 
-sendBtn.addEventListener('click', async () => {
-  const prompt = document.getElementById('prompt').value.trim();
-  if(!prompt) return;
-  appendChat('msg-user', "You: " + prompt);
-  sendBtn.disabled = true;
-  try {
-    const res = await fetch('/api/chat', {
-      method: 'POST',
-      headers: {'Content-Type':'application/json'},
-      body: JSON.stringify({prompt})
+            personaSelect.innerHTML = '';
+            
+            const defaultOption = document.createElement('option');
+            defaultOption.value = 'デフォルト';
+            defaultOption.textContent = 'デフォルト';
+            personaSelect.appendChild(defaultOption);
+
+            personalities.forEach(p => {
+                const option = document.createElement('option');
+                option.value = p;
+                option.textContent = p;
+                personaSelect.appendChild(option);
+            });
+        } catch (error) {
+            console.error('ペルソナの読み込みエラー:', error);
+        }
+    }
+
+    async function sendMessage() {
+        const prompt = userInput.value.trim();
+        if (!prompt) return;
+
+        const selectedPersonality = personaSelect.value;
+        addMessage('user', prompt);
+        userInput.value = '';
+        sendBtn.disabled = true;
+        loadingSpinner.style.display = 'block';
+
+        try {
+            const baseUrl = window.location.origin;
+            const response = await fetch(`${baseUrl}/api/chat`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ prompt: prompt, personality: selectedPersonality })
+            });
+
+            const data = await response.json();
+            if (response.ok) {
+                addMessage('bot', data.html);
+                if (data.plain) {
+                    await playAudio(data.plain);
+                }
+            } else {
+                addMessage('bot', `エラー: ${data.error}`);
+            }
+        } catch (error) {
+            addMessage('bot', '通信エラーが発生しました。');
+        } finally {
+            sendBtn.disabled = false;
+            loadingSpinner.style.display = 'none';
+            chatBox.scrollTop = chatBox.scrollHeight;
+        }
+    }
+
+    function addMessage(sender, content) {
+        const messageDiv = document.createElement('div');
+        messageDiv.classList.add('message', sender);
+        messageDiv.innerHTML = content;
+        chatBox.appendChild(messageDiv);
+        chatBox.scrollTop = chatBox.scrollHeight;
+    }
+
+    async function playAudio(text) {
+        try {
+            const baseUrl = window.location.origin;
+            const audioResponse = await fetch(`${baseUrl}/api/tts`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ text: text })
+            });
+            
+            if (audioResponse.ok) {
+                const audioBlob = await audioResponse.blob();
+                const audioUrl = URL.createObjectURL(audioBlob);
+                const audio = new Audio(audioUrl);
+                audio.play();
+            } else {
+                console.error('音声生成エラー:', audioResponse.statusText);
+            }
+        } catch (error) {
+            console.error('音声再生エラー:', error);
+        }
+    }
+
+    // イベントリスナー
+    sendBtn.addEventListener('click', sendMessage);
+    userInput.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') {
+            sendMessage();
+        }
     });
-    const data = await res.json();
-    if (data.error) {
-      appendChat('msg-ai', 'Error: ' + data.error);
-      respHtml.innerText = data.error;
-      return;
-    }
-    // 表示（HTML）と音声用プレーンテキスト（plain）を受け取る
-    if (data.html) {
-      respHtml.innerHTML = data.html;
-    } else {
-      respHtml.innerText = data.plain || '(no response)';
-    }
-    lastPlain = data.plain || "";
-    appendChat('msg-ai', 'AI: ' + (data.plain || '(no text)'));
-    if (lastPlain) {
-      repeatBtn.disabled = false;
-      await playVoice(lastPlain);
-    } else {
-      repeatBtn.disabled = true;
-    }
-  } catch (e) {
-    appendChat('msg-ai', '通信エラー: ' + e.message);
-  } finally {
-    sendBtn.disabled = false;
-  }
-});
 
-repeatBtn.addEventListener('click', async () => {
-  if (!lastPlain) return;
-  await playVoice(lastPlain);
-});
-
-async function playVoice(plainText) {
-  try {
-    const res = await fetch('/api/tts', {
-      method: 'POST',
-      headers: {'Content-Type':'application/json'},
-      body: JSON.stringify({text: plainText})
+    addPersonaBtn.addEventListener('click', () => {
+        addPersonaModal.style.display = 'block';
     });
-    if (!res.ok) {
-      const err = await res.json().catch(()=>({error:'Unknown'}));
-      appendChat('msg-ai','TTS エラー: ' + (err.error||res.status));
-      return;
-    }
-    const blob = await res.blob();
-    const url = URL.createObjectURL(blob);
-    audioEl.src = url;
-    await audioEl.play();
-  } catch (e) {
-    appendChat('msg-ai', 'TTS通信エラー: ' + e.message);
-  }
-}
+
+    closeModalBtn.addEventListener('click', () => {
+        addPersonaModal.style.display = 'none';
+    });
+
+    window.addEventListener('click', (e) => {
+        if (e.target == addPersonaModal) {
+            addPersonaModal.style.display = 'none';
+        }
+    });
+
+    addPersonaForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+
+        const formData = new FormData();
+        const name = personaNameInput.value.trim();
+        const text = personaTextInput.value.trim();
+        const file = personaFileInput.files[0];
+
+        if (!text && !file) {
+            alert('ペルソナ設定テキストまたはファイルをアップロードしてください。');
+            return;
+        }
+
+        if (name) {
+            formData.append('name', name);
+        }
+
+        if (text) {
+            formData.append('text_content', text);
+        }
+        
+        if (file) {
+            formData.append('file', file);
+        }
+
+        try {
+            const baseUrl = window.location.origin;
+            const response = await fetch(`${baseUrl}/api/personalities/add`, {
+                method: 'POST',
+                body: formData
+            });
+
+            const data = await response.json();
+            alert(data.message || data.error);
+            
+            if (response.ok) {
+                addPersonaModal.style.display = 'none';
+                personaNameInput.value = '';
+                personaTextInput.value = '';
+                personaFileInput.value = '';
+                await loadPersonalities();
+            }
+        } catch (error) {
+            alert('ペルソナの追加中にエラーが発生しました。');
+        }
+    });
+    
+    initializeUI();
 </script>
+
 </body>
 </html>
