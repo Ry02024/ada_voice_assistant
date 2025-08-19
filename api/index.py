@@ -29,7 +29,9 @@ try:
     GOOGLE_API_KEY = os.environ.get('GOOGLE_API_KEY')
     FISH_AUDIO_TOKEN = os.environ.get('FISH_AUDIO_TOKEN')
     FISH_AUDIO_VOICE_ID = os.environ.get('FISH_AUDIO_VOICE_ID')
-    
+    BLOB_READ_WRITE_TOKEN = os.environ.get('BLOB_READ_WRITE_TOKEN')
+    VERCEL_PROJECT_ID = os.environ.get('VERCEL_PROJECT_ID')
+
     # genai.Client 初期化
     genai_client = genai.Client(api_key=GOOGLE_API_KEY)
     print("Geminiクライアントを初期化しました。")
@@ -78,26 +80,6 @@ def markdown_to_html(md_text: str) -> str:
     except Exception:
         return f"<pre>{md_text or ''}</pre>"
 
-def load_personalities():
-    """personalitiesディレクトリからすべての人格ファイルを読み込む"""
-    personalities = {}
-    personalities_dir = 'personalities'
-    if not os.path.exists(personalities_dir):
-        os.makedirs(personalities_dir)
-        return personalities
-    
-    for filename in os.listdir(personalities_dir):
-        if filename.endswith('.json'):
-            file_path = os.path.join(personalities_dir, filename)
-            try:
-                with open(file_path, 'r', encoding='utf-8') as f:
-                    data = json.load(f)
-                    name = os.path.splitext(filename)[0]
-                    personalities[name] = data.get("system_instruction", "")
-            except Exception as e:
-                print(f"人格ファイル '{filename}' の読み込みエラー: {e}")
-    return personalities
-
 def extract_text_from_file(file_path, file_extension):
     """ファイルの拡張子に応じてテキストを抽出する"""
     text_content = ""
@@ -145,28 +127,6 @@ def generate_personality_name(text_content):
         print(f"人格名生成エラー: {e}")
         return "新しいペルソナ"
 
-def save_personality(text_content, user_defined_name=None):
-    """人格設定を JSON ファイルとして保存する"""
-    personalities_dir = 'personalities'
-    if not os.path.exists(personalities_dir):
-        os.makedirs(personalities_dir)
-    
-    if user_defined_name:
-        name = user_defined_name.replace(" ", "_").replace("/", "_")
-    else:
-        name = generate_personality_name(text_content).replace(" ", "_").replace("/", "_")
-    
-    file_path = os.path.join(personalities_dir, f"{name}.json")
-    
-    data = {"system_instruction": text_content}
-    with open(file_path, 'w', encoding='utf-8') as f:
-        json.dump(data, f, ensure_ascii=False, indent=4)
-    
-    return name
-
-# --------------------------
-# Fish Audio 呼び出し
-# --------------------------
 def get_ada_voice(text: str):
     if not FISH_AUDIO_TOKEN:
         print("Fish Audio token missing")
@@ -186,6 +146,67 @@ def get_ada_voice(text: str):
         return None
 
 # --------------------------
+# Blob操作関数
+# --------------------------
+def save_personality_to_blob(text_content, user_defined_name=None):
+    """人格設定をBlobにJSONとして保存する"""
+    if not BLOB_READ_WRITE_TOKEN:
+        raise Exception("Vercel Blobトークンが設定されていません。")
+    
+    if user_defined_name:
+        name = user_defined_name.replace(" ", "_").replace("/", "_")
+    else:
+        name = generate_personality_name(text_content).replace(" ", "_").replace("/", "_")
+    
+    file_name = f"{name}.json"
+    data = {"system_instruction": text_content}
+    
+    # Vercel Blob APIのURLを構築
+    blob_api_url = f"https://api.vercel.com/v2/blobs/put?token={BLOB_READ_WRITE_TOKEN}"
+
+    try:
+        response = requests.put(
+            url=blob_api_url,
+            headers={"Content-Type": "application/json"},
+            data=json.dumps(data, ensure_ascii=False).encode('utf-8')
+        )
+        response.raise_for_status()
+        uploaded_blob = response.json()
+        print(f"ペルソナ '{name}' をBlobに保存しました。URL: {uploaded_blob['url']}")
+        return name
+    except requests.exceptions.RequestException as e:
+        raise Exception(f"Blobへの保存中にエラーが発生しました: {e}")
+
+def load_personalities_from_blob():
+    """Blobからすべての人格を読み込む"""
+    personalities = {}
+    if not BLOB_READ_WRITE_TOKEN or not VERCEL_PROJECT_ID:
+        return {}
+    
+    list_api_url = f"https://api.vercel.com/v2/blobs/list?token={BLOB_READ_WRITE_TOKEN}"
+    try:
+        response = requests.get(list_api_url)
+        response.raise_for_status()
+        
+        files = response.json().get('blobs', [])
+        
+        for file in files:
+            if file['pathname'].endswith('.json'):
+                blob_url = f"https://{VERCEL_PROJECT_ID}.vercel.app/blobs/{file['pathname']}"
+                file_response = requests.get(blob_url)
+                if file_response.status_code == 200:
+                    try:
+                        data = file_response.json()
+                        name = os.path.splitext(file['pathname'])[0]
+                        personalities[name] = data.get("system_instruction", "")
+                    except json.JSONDecodeError:
+                        print(f"JSONデコードエラー: {file['pathname']}")
+                        continue
+    except requests.exceptions.RequestException as e:
+        print(f"Blobからの読み込みエラー: {e}")
+    return personalities
+
+# --------------------------
 # エンドポイント
 # --------------------------
 @app.route("/")
@@ -194,7 +215,7 @@ def index():
 
 @app.route("/api/personalities", methods=['GET'])
 def list_personalities():
-    personalities = load_personalities()
+    personalities = load_personalities_from_blob()
     return jsonify({"personalities": list(personalities.keys())})
 
 @app.route("/api/chat", methods=['POST'])
@@ -209,17 +230,15 @@ def api_chat():
     if not prompt:
         return jsonify({"error":"プロンプトがありません"}), 400
 
-    # 選択されたペルソナを読み込む
-    personalities = load_personalities()
+    # 選択されたペルソナをBlobから読み込む
+    personalities = load_personalities_from_blob()
     system_instruction = personalities.get(personality_name, "あなたは親切なアシスタントです。")
-    
-    # system_instructionをユーザープロンプトに統合
-    full_prompt = f"{system_instruction}\n\nユーザー入力: {prompt}"
     
     try:
         response = genai_client.models.generate_content(
             model="gemini-2.5-flash-lite-preview-06-17",
-            contents=full_prompt
+            contents=prompt,
+            system_instruction=system_instruction
         )
         md_text = getattr(response, "text", "") or str(response)
         html = markdown_to_html(md_text)
@@ -242,6 +261,9 @@ def api_tts():
 
 @app.route("/api/personalities/add", methods=['POST'])
 def add_personality():
+    if not BLOB_READ_WRITE_TOKEN:
+        return jsonify({"error": "Vercel Blobトークンが設定されていません。"}), 500
+        
     if 'file' not in request.files and 'text_content' not in request.form:
         return jsonify({"error": "ファイルまたはテキストが提供されていません。"}), 400
 
@@ -271,10 +293,10 @@ def add_personality():
         return jsonify({"error": "抽出されたテキストが空です。"}), 400
 
     try:
-        new_name = save_personality(text_content, user_defined_name)
+        new_name = save_personality_to_blob(text_content, user_defined_name)
         return jsonify({"message": f"新しいペルソナ '{new_name}' を追加しました。"})
     except Exception as e:
-        return jsonify({"error": f"ペルソナの保存中にエラーが発生しました: {e}"}), 500
+        return jsonify({"error": str(e)}), 500
 
 if __name__ == '__main__':
     # ローカル実行
