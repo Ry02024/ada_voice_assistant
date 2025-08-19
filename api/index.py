@@ -14,8 +14,6 @@ from docx import Document
 from PyPDF2 import PdfReader
 import csv
 
-VERCEL_PROJECT_ID = os.environ.get('VERCEL_PROJECT_ID')
-
 # ローカルで実行する場合に .env ファイルを読み込む
 load_dotenv()
 
@@ -31,9 +29,6 @@ try:
     GOOGLE_API_KEY = os.environ.get('GOOGLE_API_KEY')
     FISH_AUDIO_TOKEN = os.environ.get('FISH_AUDIO_TOKEN')
     FISH_AUDIO_VOICE_ID = os.environ.get('FISH_AUDIO_VOICE_ID')
-    BLOB_READ_WRITE_TOKEN = os.environ.get('BLOB_READ_WRITE_TOKEN')
-    VERCEL_PROJECT_ID = os.environ.get('VERCEL_PROJECT_ID')
-
     # genai.Client 初期化
     genai_client = genai.Client(api_key=GOOGLE_API_KEY)
     print("Geminiクライアントを初期化しました。")
@@ -148,78 +143,11 @@ def get_ada_voice(text: str):
         return None
 
 # --------------------------
-# Blob操作関数
-# --------------------------
-def save_personality_to_blob(text_content, user_defined_name=None):
-    """人格設定をBlobにJSONとして保存する"""
-    if not BLOB_READ_WRITE_TOKEN or not VERCEL_PROJECT_ID:
-        raise Exception("Vercel BlobトークンまたはプロジェクトIDが設定されていません。")
-
-    if user_defined_name:
-        name = user_defined_name.replace(" ", "_").replace("/", "_")
-    else:
-        name = generate_personality_name(text_content).replace(" ", "_").replace("/", "_")
-
-    file_name = f"{name}.json"
-    data = {"system_instruction": text_content}
-
-    # Vercel Blob APIのURLを構築
-    # ここが最も重要な修正点です
-    blob_api_url = f"https://api.vercel.com/v2/blobs/put?token={BLOB_READ_WRITE_TOKEN}&projectId={VERCEL_PROJECT_ID}"
-
-    try:
-        response = requests.put(
-            url=blob_api_url,
-            headers={"Content-Type": "application/json"},
-            data=json.dumps(data, ensure_ascii=False).encode('utf-8')
-        )
-        response.raise_for_status()
-        uploaded_blob = response.json()
-        print(f"ペルソナ '{name}' をBlobに保存しました。URL: {uploaded_blob['url']}")
-        return name
-    except requests.exceptions.RequestException as e:
-        raise Exception(f"Blobへの保存中にエラーが発生しました: {e}")
-
-def load_personalities_from_blob():
-    """Blobからすべての人格を読み込む"""
-    personalities = {}
-    if not BLOB_READ_WRITE_TOKEN or not VERCEL_PROJECT_ID:
-        return {}
-    
-    list_api_url = f"https://api.vercel.com/v2/blobs/list?token={BLOB_READ_WRITE_TOKEN}"
-    try:
-        response = requests.get(list_api_url)
-        response.raise_for_status()
-        
-        files = response.json().get('blobs', [])
-        
-        for file in files:
-            if file['pathname'].endswith('.json'):
-                blob_url = f"https://{VERCEL_PROJECT_ID}.vercel.app/blobs/{file['pathname']}"
-                file_response = requests.get(blob_url)
-                if file_response.status_code == 200:
-                    try:
-                        data = file_response.json()
-                        name = os.path.splitext(file['pathname'])[0]
-                        personalities[name] = data.get("system_instruction", "")
-                    except json.JSONDecodeError:
-                        print(f"JSONデコードエラー: {file['pathname']}")
-                        continue
-    except requests.exceptions.RequestException as e:
-        print(f"Blobからの読み込みエラー: {e}")
-    return personalities
-
-# --------------------------
 # エンドポイント
 # --------------------------
 @app.route("/")
 def index():
     return render_template('index.html')
-
-@app.route("/api/personalities", methods=['GET'])
-def list_personalities():
-    personalities = load_personalities_from_blob()
-    return jsonify({"personalities": list(personalities.keys())})
 
 @app.route("/api/chat", methods=['POST'])
 def api_chat():
@@ -233,23 +161,6 @@ def api_chat():
     if not prompt:
         return jsonify({"error":"プロンプトがありません"}), 400
 
-    # 選択されたペルソナをBlobから読み込む
-    personalities = load_personalities_from_blob()
-    system_instruction = personalities.get(personality_name, "あなたは親切なアシスタントです。")
-    
-    try:
-        response = genai_client.models.generate_content(
-            model="gemini-2.5-flash-lite-preview-06-17",
-            contents=prompt,
-            system_instruction=system_instruction
-        )
-        md_text = getattr(response, "text", "") or str(response)
-        html = markdown_to_html(md_text)
-        plain = markdown_to_plaintext(md_text)
-        return jsonify({"html": html, "plain": plain})
-    except Exception as e:
-        return jsonify({"error": f"Gemini API エラー: {e}"}), 500
-
 @app.route("/api/tts", methods=['POST'])
 def api_tts():
     d = request.get_json(force=True, silent=True) or {}
@@ -261,45 +172,6 @@ def api_tts():
         return send_file(io.BytesIO(audio), mimetype="audio/mpeg")
     else:
         return jsonify({"error":"音声生成に失敗しました"}), 500
-
-@app.route("/api/personalities/add", methods=['POST'])
-def add_personality():
-    if not BLOB_READ_WRITE_TOKEN:
-        return jsonify({"error": "Vercel Blobトークンが設定されていません。"}), 500
-        
-    if 'file' not in request.files and 'text_content' not in request.form:
-        return jsonify({"error": "ファイルまたはテキストが提供されていません。"}), 400
-
-    text_content = request.form.get('text_content', '')
-    user_defined_name = request.form.get('name', None)
-
-    if 'file' in request.files:
-        file = request.files['file']
-        filename, file_extension = os.path.splitext(file.filename)
-        
-        # ファイルを一時的に保存
-        temp_path = os.path.join(app.root_path, "temp_file" + file_extension)
-        file.save(temp_path)
-        
-        try:
-            text_content = extract_text_from_file(temp_path, file_extension)
-        except ValueError as e:
-            os.remove(temp_path)
-            return jsonify({"error": str(e)}), 400
-        except Exception as e:
-            os.remove(temp_path)
-            return jsonify({"error": f"ファイルの読み込み中にエラーが発生しました: {e}"}), 500
-        finally:
-            os.remove(temp_path) # 一時ファイルを削除
-
-    if not text_content:
-        return jsonify({"error": "抽出されたテキストが空です。"}), 400
-
-    try:
-        new_name = save_personality_to_blob(text_content, user_defined_name)
-        return jsonify({"message": f"新しいペルソナ '{new_name}' を追加しました。"})
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
 
 if __name__ == '__main__':
     # ローカル実行
