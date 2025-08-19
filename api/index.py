@@ -152,18 +152,19 @@ def get_ada_voice(text: str):
 # --------------------------
 def save_personality_to_blob(text_content, user_defined_name=None):
     """人格設定をBlobにJSONとして保存する"""
-    if not BLOB_READ_WRITE_TOKEN:
-        raise Exception("Vercel Blobトークンが設定されていません。")
-    
+    if not BLOB_READ_WRITE_TOKEN or not VERCEL_PROJECT_ID:
+        raise Exception("Vercel BlobトークンまたはプロジェクトIDが設定されていません。")
+
     if user_defined_name:
         name = user_defined_name.replace(" ", "_").replace("/", "_")
     else:
         name = generate_personality_name(text_content).replace(" ", "_").replace("/", "_")
-    
+
     file_name = f"{name}.json"
     data = {"system_instruction": text_content}
-    
+
     # Vercel Blob APIのURLを構築
+    # ここが最も重要な修正点です
     blob_api_url = f"https://api.vercel.com/v2/blobs/put?token={BLOB_READ_WRITE_TOKEN}&projectId={VERCEL_PROJECT_ID}"
 
     try:
