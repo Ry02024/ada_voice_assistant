@@ -29,7 +29,9 @@ try:
     GOOGLE_API_KEY = os.environ.get('GOOGLE_API_KEY')
     FISH_AUDIO_TOKEN = os.environ.get('FISH_AUDIO_TOKEN')
     FISH_AUDIO_VOICE_ID = os.environ.get('FISH_AUDIO_VOICE_ID')
-    
+    BLOB_READ_WRITE_TOKEN = os.environ.get('BLOB_READ_WRITE_TOKEN')
+    VERCEL_PROJECT_ID = os.environ.get('VERCEL_PROJECT_ID')
+
     # genai.Client 初期化
     genai_client = genai.Client(api_key=GOOGLE_API_KEY)
     print("Geminiクライアントを初期化しました。")
@@ -56,9 +58,7 @@ def convert_times_for_speech(text: str) -> str:
 def markdown_to_plaintext(md_text: str) -> str:
     if not md_text:
         return ""
-    # コードブロックを削除
     text = re.sub(r"```.*?```", "", md_text, flags=re.DOTALL)
-    # Markdown記号を削除
     text = re.sub(r"^[\*\-\+]\s+", "", text, flags=re.MULTILINE)
     text = re.sub(r"\*\*(.*?)\*\*", r"\1", text)
     text = re.sub(r"\*(.*?)\*", r"\1", text)
@@ -66,7 +66,6 @@ def markdown_to_plaintext(md_text: str) -> str:
     text = re.sub(r"^[#]+\s*", "", text, flags=re.MULTILINE)
     text = re.sub(r"<[^>]+>", "", text)
     text = convert_times_for_speech(text)
-    # 連続する空白を1つにまとめる
     text = re.sub(r"\s+", " ", text).strip()
     return text
 
@@ -77,26 +76,6 @@ def markdown_to_html(md_text: str) -> str:
         return markdown.markdown(md_text, extensions=['nl2br'])
     except Exception:
         return f"<pre>{md_text or ''}</pre>"
-
-def load_personalities():
-    """personalitiesディレクトリからすべての人格ファイルを読み込む"""
-    personalities = {}
-    personalities_dir = 'personalities'
-    if not os.path.exists(personalities_dir):
-        os.makedirs(personalities_dir)
-        return personalities
-    
-    for filename in os.listdir(personalities_dir):
-        if filename.endswith('.json'):
-            file_path = os.path.join(personalities_dir, filename)
-            try:
-                with open(file_path, 'r', encoding='utf-8') as f:
-                    data = json.load(f)
-                    name = os.path.splitext(filename)[0]
-                    personalities[name] = data.get("system_instruction", "")
-            except Exception as e:
-                print(f"人格ファイル '{filename}' の読み込みエラー: {e}")
-    return personalities
 
 def extract_text_from_file(file_path, file_extension):
     """ファイルの拡張子に応じてテキストを抽出する"""
@@ -145,24 +124,115 @@ def generate_personality_name(text_content):
         print(f"人格名生成エラー: {e}")
         return "新しいペルソナ"
 
-def save_personality(text_content, user_defined_name=None):
-    """人格設定を JSON ファイルとして保存する"""
-    personalities_dir = 'personalities'
-    if not os.path.exists(personalities_dir):
-        os.makedirs(personalities_dir)
+# --------------------------
+# Blob操作関数
+# --------------------------
+def save_personality_to_blob(text_content, user_defined_name=None):
+    """人格設定をBlobにJSONとして保存する"""
+    if not BLOB_READ_WRITE_TOKEN or not VERCEL_PROJECT_ID:
+        raise Exception("Vercel BlobトークンまたはプロジェクトIDが設定されていません。")
     
     if user_defined_name:
         name = user_defined_name.replace(" ", "_").replace("/", "_")
     else:
         name = generate_personality_name(text_content).replace(" ", "_").replace("/", "_")
     
-    file_path = os.path.join(personalities_dir, f"{name}.json")
-    
+    file_name = f"{name}.json"
     data = {"system_instruction": text_content}
-    with open(file_path, 'w', encoding='utf-8') as f:
-        json.dump(data, f, ensure_ascii=False, indent=4)
     
-    return name
+    # Vercel Blob APIのURLを構築
+    blob_api_url = f"https://api.vercel.com/v2/blobs/put?token={BLOB_READ_WRITE_TOKEN}&projectId={VERCEL_PROJECT_ID}"
+
+    try:
+        response = requests.put(
+            url=blob_api_url,
+            headers={"Content-Type": "application/json"},
+            data=json.dumps(data, ensure_ascii=False).encode('utf-8')
+        )
+        response.raise_for_status()
+        uploaded_blob = response.json()
+        print(f"ペルソナ '{name}' をBlobに保存しました。URL: {uploaded_blob['url']}")
+        return name
+    except requests.exceptions.RequestException as e:
+        raise Exception(f"Blobへの保存中にエラーが発生しました: {e}")
+
+def load_personalities_from_blob():
+    """Blobからすべての人格を読み込む"""
+    personalities = {}
+    if not BLOB_READ_WRITE_TOKEN or not VERCEL_PROJECT_ID:
+        return {}
+    
+    list_api_url = f"https://api.vercel.com/v2/blobs/list?token={BLOB_READ_WRITE_TOKEN}&projectId={VERCEL_PROJECT_ID}"
+    try:
+        response = requests.get(list_api_url)
+        response.raise_for_status()
+        
+        files = response.json().get('blobs', [])
+        
+        for file in files:
+            if file['pathname'].endswith('.json'):
+                blob_url = file['url']
+                file_response = requests.get(blob_url)
+                if file_response.status_code == 200:
+                    try:
+                        data = file_response.json()
+                        name = os.path.splitext(file['pathname'])[0]
+                        personalities[name] = data.get("system_instruction", "")
+                    except json.JSONDecodeError:
+                        print(f"JSONデコードエラー: {file['pathname']}")
+                        continue
+    except requests.exceptions.RequestException as e:
+        print(f"Blobからの読み込みエラー: {e}")
+    return personalities
+
+def load_personalities():
+    """環境に応じてBlobまたはローカルディレクトリから人格を読み込む"""
+    if BLOB_READ_WRITE_TOKEN and VERCEL_PROJECT_ID:
+        print("Blobからペルソナを読み込みます。")
+        return load_personalities_from_blob()
+    else:
+        print("ローカルからペルソナを読み込みます。")
+        personalities = {}
+        personalities_dir = 'personalities'
+        if not os.path.exists(personalities_dir):
+            os.makedirs(personalities_dir)
+            return personalities
+        
+        for filename in os.listdir(personalities_dir):
+            if filename.endswith('.json'):
+                file_path = os.path.join(personalities_dir, filename)
+                try:
+                    with open(file_path, 'r', encoding='utf-8') as f:
+                        data = json.load(f)
+                        name = os.path.splitext(filename)[0]
+                        personalities[name] = data.get("system_instruction", "")
+                except Exception as e:
+                    print(f"人格ファイル '{filename}' の読み込みエラー: {e}")
+        return personalities
+
+def save_personality(text_content, user_defined_name=None):
+    """環境に応じてBlobまたはローカルディレクトリに人格を保存する"""
+    if BLOB_READ_WRITE_TOKEN and VERCEL_PROJECT_ID:
+        print("Blobにペルソナを保存します。")
+        return save_personality_to_blob(text_content, user_defined_name)
+    else:
+        print("ローカルにペルソナを保存します。")
+        personalities_dir = 'personalities'
+        if not os.path.exists(personalities_dir):
+            os.makedirs(personalities_dir)
+        
+        if user_defined_name:
+            name = user_defined_name.replace(" ", "_").replace("/", "_")
+        else:
+            name = generate_personality_name(text_content).replace(" ", "_").replace("/", "_")
+        
+        file_path = os.path.join(personalities_dir, f"{name}.json")
+        
+        data = {"system_instruction": text_content}
+        with open(file_path, 'w', encoding='utf-8') as f:
+            json.dump(data, f, ensure_ascii=False, indent=4)
+        
+        return name
 
 # --------------------------
 # Fish Audio 呼び出し
