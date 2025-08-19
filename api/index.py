@@ -125,46 +125,64 @@ def generate_personality_name(text_content):
         return "新しいペルソナ"
 
 # --------------------------
-# Blob操作関数
+# Blob操作関数 (改善版)
 # --------------------------
 def save_personality_to_blob(text_content, user_defined_name=None):
     """人格設定をBlobにJSONとして保存する"""
-    if not BLOB_READ_WRITE_TOKEN or not VERCEL_PROJECT_ID:
-        raise Exception("Vercel BlobトークンまたはプロジェクトIDが設定されていません。")
+    if not BLOB_READ_WRITE_TOKEN:
+        raise Exception("Vercel Blobトークンが設定されていません。")
     
     if user_defined_name:
         name = user_defined_name.replace(" ", "_").replace("/", "_")
     else:
         name = generate_personality_name(text_content).replace(" ", "_").replace("/", "_")
     
-    file_name = f"{name}.json"
     data = {"system_instruction": text_content}
     
     # Vercel Blob APIのURLを構築
-    blob_api_url = f"https://api.vercel.com/v2/blobs/put?token={BLOB_READ_WRITE_TOKEN}&projectId={VERCEL_PROJECT_ID}"
+    blob_api_url = "https://blob.vercel-storage.com/" # PUT/POSTは新しいドメインを使用
+    
+    # ファイル名をクエリパラメータとして追加
+    headers = {
+        "Content-Type": "application/json",
+        "Authorization": f"Bearer {BLOB_READ_WRITE_TOKEN}",
+        "x-filename": f"{name}.json" # ファイル名をヘッダーで指定
+    }
 
     try:
         response = requests.put(
             url=blob_api_url,
-            headers={"Content-Type": "application/json"},
+            headers=headers,
             data=json.dumps(data, ensure_ascii=False).encode('utf-8')
         )
         response.raise_for_status()
         uploaded_blob = response.json()
-        print(f"ペルソナ '{name}' をBlobに保存しました。URL: {uploaded_blob['url']}")
+        print(f"✅ ペルソナ '{name}' をBlobに保存しました。URL: {uploaded_blob['url']}")
         return name
+    except requests.exceptions.HTTPError as e:
+        print(f"❌ Blobへの保存中にHTTPエラーが発生しました: {e.response.status_code}")
+        print("エラーレスポンス本文:", e.response.text)
+        raise Exception(f"Blobへの保存中にHTTPエラーが発生しました: {e.response.status_code}")
     except requests.exceptions.RequestException as e:
+        print(f"❌ Blobへの保存中にリクエストエラーが発生しました: {e}")
         raise Exception(f"Blobへの保存中にエラーが発生しました: {e}")
 
 def load_personalities_from_blob():
     """Blobからすべての人格を読み込む"""
     personalities = {}
-    if not BLOB_READ_WRITE_TOKEN or not VERCEL_PROJECT_ID:
+    if not BLOB_READ_WRITE_TOKEN:
+        print("Blobトークンが設定されていません。")
         return {}
     
-    list_api_url = f"https://api.vercel.com/v2/blobs/list?token={BLOB_READ_WRITE_TOKEN}&projectId={VERCEL_PROJECT_ID}"
+    # リスト表示APIのURL（ドキュメントに合わせて変更）
+    list_api_url = "https://blob.vercel-storage.com/"
+    
+    headers = {
+        "Authorization": f"Bearer {BLOB_READ_WRITE_TOKEN}"
+    }
+
     try:
-        response = requests.get(list_api_url)
+        response = requests.get(list_api_url, headers=headers)
         response.raise_for_status()
         
         files = response.json().get('blobs', [])
@@ -172,17 +190,21 @@ def load_personalities_from_blob():
         for file in files:
             if file['pathname'].endswith('.json'):
                 blob_url = file['url']
-                file_response = requests.get(blob_url)
+                file_response = requests.get(blob_url, headers=headers) # 読み込み時もトークンが必要
                 if file_response.status_code == 200:
                     try:
                         data = file_response.json()
                         name = os.path.splitext(file['pathname'])[0]
                         personalities[name] = data.get("system_instruction", "")
                     except json.JSONDecodeError:
-                        print(f"JSONデコードエラー: {file['pathname']}")
+                        print(f"❌ JSONデコードエラー: {file['pathname']}")
                         continue
+        print("✅ Blobからペルソナを読み込みました。")
+    except requests.exceptions.HTTPError as e:
+        print(f"❌ Blobからの読み込み中にHTTPエラーが発生しました: {e.response.status_code}")
+        print("エラーレスポンス本文:", e.response.text)
     except requests.exceptions.RequestException as e:
-        print(f"Blobからの読み込みエラー: {e}")
+        print(f"❌ Blobからの読み込み中にリクエストエラーが発生しました: {e}")
     return personalities
 
 def load_personalities():
