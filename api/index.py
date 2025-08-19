@@ -164,7 +164,7 @@ def save_personality_to_blob(text_content, user_defined_name=None):
     data = {"system_instruction": text_content}
     
     # Vercel Blob APIのURLを構築
-    blob_api_url = f"https://api.vercel.com/v2/blobs/put?token={BLOB_READ_WRITE_TOKEN}"
+    blob_api_url = f"https://api.vercel.com/v2/blobs/put?token={BLOB_READ_WRITE_TOKEN}&projectId={VERCEL_PROJECT_ID}"
 
     try:
         response = requests.put(
