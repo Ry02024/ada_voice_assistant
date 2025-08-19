@@ -14,6 +14,8 @@ from docx import Document
 from PyPDF2 import PdfReader
 import csv
 
+VERCEL_PROJECT_ID = os.environ.get('VERCEL_PROJECT_ID')
+
 # ローカルで実行する場合に .env ファイルを読み込む
 load_dotenv()
 
