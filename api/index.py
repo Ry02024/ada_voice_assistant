@@ -86,6 +86,7 @@ def markdown_to_html(md_text: str) -> str:
 
 def extract_text_from_file(file_path, file_extension):
     """ファイルの拡張子に応じてテキストを抽出する"""
+    print(f"📄 ファイルからテキストを抽出中: {file_extension}")
     text_content = ""
     if file_extension == ".txt":
         with open(file_path, 'r', encoding='utf-8') as f:
@@ -104,10 +105,12 @@ def extract_text_from_file(file_path, file_extension):
             text_content = "\n".join([",".join(row) for row in reader])
     else:
         raise ValueError(f"サポートされていないファイル形式です: {file_extension}")
+    print("✅ テキスト抽出完了")
     return text_content
 
 def generate_personality_name(text_content):
     """Gemini API を使ってテキスト内容から人格名を生成する"""
+    print("🤖 Geminiでペルソナ名を生成中...")
     if not genai_client:
         return "新しいペルソナ"
     
@@ -126,9 +129,10 @@ def generate_personality_name(text_content):
             contents=prompt_text
         )
         name = response.text.strip().replace('"', '')
+        print(f"✅ ペルソナ名生成完了: {name}")
         return name
     except Exception as e:
-        print(f"人格名生成エラー: {e}")
+        print(f"❌ 人格名生成エラー: {e}")
         return "新しいペルソナ"
 
 # --------------------------
@@ -136,6 +140,7 @@ def generate_personality_name(text_content):
 # --------------------------
 def save_personality_to_blob(text_content, user_defined_name=None):
     """人格設定をBlobにJSONとして保存する"""
+    print("📤 Blobにデータをアップロード中...")
     if not BLOB_READ_WRITE_TOKEN:
         raise Exception("Vercel Blobトークンが設定されていません。")
     
@@ -154,38 +159,34 @@ def save_personality_to_blob(text_content, user_defined_name=None):
     }
 
     try:
-        # requests.putの呼び出しをtry...exceptで囲み、詳細なログを出力
         response = requests.put(
             url=blob_api_url,
             headers=headers,
             json=data
         )
-        response.raise_for_status()  # 200番台以外のステータスコードで例外を発生
+        response.raise_for_status()
         uploaded_blob = response.json()
         print(f"✅ ペルソナ '{name}' をBlobに保存しました。URL: {uploaded_blob['url']}")
         return name
     except requests.exceptions.HTTPError as e:
-        # HTTPエラーの場合
         print(f"❌ HTTPエラーが発生しました: {e.response.status_code}")
         print("エラー本文:", e.response.text)
         raise
     except requests.exceptions.RequestException as e:
-        # その他のリクエストエラーの場合
         print(f"❌ リクエストエラーが発生しました: {e}")
         raise
     except Exception as e:
-        # 予期しないエラーの場合
         print(f"❌ 予期しないエラーが発生しました: {e}")
         raise
 
 def load_personalities_from_blob():
     """Blobからすべての人格を読み込む"""
+    print("📥 Blobからデータをダウンロード中...")
     personalities = {}
     if not BLOB_READ_WRITE_TOKEN:
         print("Blobトークンが設定されていません。")
         return {}
     
-    # リスト表示APIのURL（ドキュメントに合わせて変更）
     list_api_url = "https://blob.vercel-storage.com/"
     
     headers = {
@@ -201,7 +202,7 @@ def load_personalities_from_blob():
         for file in files:
             if file['pathname'].endswith('.json'):
                 blob_url = file['url']
-                file_response = requests.get(blob_url, headers=headers) # 読み込み時もトークンが必要
+                file_response = requests.get(blob_url, headers=headers)
                 if file_response.status_code == 200:
                     try:
                         data = file_response.json()
@@ -220,6 +221,7 @@ def load_personalities_from_blob():
 
 def load_personalities():
     """環境に応じてBlobまたはローカルディレクトリから人格を読み込む"""
+    print("🔄 ペルソナをロード中...")
     if BLOB_READ_WRITE_TOKEN and VERCEL_PROJECT_ID:
         print("Blobからペルソナを読み込みます。")
         return load_personalities_from_blob()
@@ -240,11 +242,12 @@ def load_personalities():
                         name = os.path.splitext(filename)[0]
                         personalities[name] = data.get("system_instruction", "")
                 except Exception as e:
-                    print(f"人格ファイル '{filename}' の読み込みエラー: {e}")
+                    print(f"❌ 人格ファイル '{filename}' の読み込みエラー: {e}")
         return personalities
 
 def save_personality(text_content, user_defined_name=None):
     """環境に応じてBlobまたはローカルディレクトリに人格を保存する"""
+    print("📝 ペルソナを保存中...")
     if BLOB_READ_WRITE_TOKEN and VERCEL_PROJECT_ID:
         print("Blobにペルソナを保存します。")
         return save_personality_to_blob(text_content, user_defined_name)
@@ -271,6 +274,7 @@ def save_personality(text_content, user_defined_name=None):
 # Fish Audio 呼び出し
 # --------------------------
 def get_ada_voice(text: str):
+    print("🎤 音声生成を開始します...")
     if not FISH_AUDIO_TOKEN:
         print("Fish Audio token missing")
         return None
@@ -283,9 +287,10 @@ def get_ada_voice(text: str):
     try:
         r = requests.post(API_URL, headers=headers, json=data, timeout=30)
         r.raise_for_status()
+        print("✅ 音声生成完了")
         return r.content
     except Exception as e:
-        print("Fish Audio API エラー:", e)
+        print("❌ Fish Audio API エラー:", e)
         return None
 
 # --------------------------
@@ -293,15 +298,18 @@ def get_ada_voice(text: str):
 # --------------------------
 @app.route("/")
 def index():
+    print("🌐 indexページにアクセスされました。")
     return render_template('index.html')
 
 @app.route("/api/personalities", methods=['GET'])
 def list_personalities():
+    print("📝 /api/personalities がリクエストされました。")
     personalities = load_personalities()
     return jsonify({"personalities": list(personalities.keys())})
 
 @app.route("/api/chat", methods=['POST'])
 def api_chat():
+    print("💬 /api/chat がリクエストされました。")
     if not genai_client:
         return jsonify({"error": "Geminiクライアントが初期化されていません。APIキーを確認してください。"}), 500
 
@@ -312,6 +320,7 @@ def api_chat():
     if not prompt:
         return jsonify({"error":"プロンプトがありません"}), 400
 
+    print(f"🤖 ペルソナ '{personality_name}' でチャットを生成中...")
     # 選択されたペルソナを読み込む
     personalities = load_personalities()
     system_instruction = personalities.get(personality_name, "あなたは親切なアシスタントです。")
@@ -327,12 +336,15 @@ def api_chat():
         md_text = getattr(response, "text", "") or str(response)
         html = markdown_to_html(md_text)
         plain = markdown_to_plaintext(md_text)
+        print("✅ チャット応答生成完了。")
         return jsonify({"html": html, "plain": plain})
     except Exception as e:
+        print("❌ Gemini API エラー:", e)
         return jsonify({"error": f"Gemini API エラー: {e}"}), 500
 
 @app.route("/api/tts", methods=['POST'])
 def api_tts():
+    print("🔊 /api/tts がリクエストされました。")
     d = request.get_json(force=True, silent=True) or {}
     text = d.get("text", "")
     if not text:
@@ -345,6 +357,7 @@ def api_tts():
 
 @app.route("/api/personalities/add", methods=['POST'])
 def add_personality():
+    print("➕ /api/personalities/add がリクエストされました。")
     if 'file' not in request.files and 'text_content' not in request.form:
         return jsonify({"error": "ファイルまたはテキストが提供されていません。"}), 400
 
@@ -375,8 +388,10 @@ def add_personality():
 
     try:
         new_name = save_personality(text_content, user_defined_name)
+        print("✅ ペルソナ追加処理完了。")
         return jsonify({"message": f"新しいペルソナ '{new_name}' を追加しました。"})
     except Exception as e:
+        print("❌ ペルソナ追加処理中にエラーが発生しました。")
         return jsonify({"error": f"ペルソナの保存中にエラーが発生しました: {e}"}), 500
 
 if __name__ == '__main__':
