@@ -4,6 +4,7 @@ import re
 import io
 import requests
 import markdown
+import vercel_blob
 import google.genai as genai
 from flask import Flask, request, jsonify, send_file, render_template
 from flask_cors import CORS
@@ -136,87 +137,83 @@ def generate_personality_name(text_content):
         return "新しいペルソナ"
 
 # --------------------------
-# Blob操作関数 (修正版)
+# Blob操作関数 (vercel_blob版)
 # --------------------------
 def save_personality_to_blob(text_content, user_defined_name=None):
     """人格設定をBlobにJSONとして保存する"""
     print("📤 Blobにデータをアップロード中...")
+    
     if not BLOB_READ_WRITE_TOKEN:
         raise Exception("Vercel Blobトークンが設定されていません。")
+
+    # `vercel_blob` ライブラリは環境変数からトークンを自動で読み込む
+    # そのため、os.environ.get() で取得した値を直接使う必要はないですが、
+    # 既存のコードのチェックは残しておきます。
     
     if user_defined_name:
         name = user_defined_name.replace(" ", "_").replace("/", "_")
     else:
         name = generate_personality_name(text_content).replace(" ", "_").replace("/", "_")
     
+    # データを辞書として定義
     data = {"system_instruction": text_content}
-    blob_api_url = "https://blob.vercel-storage.com/"
     
-    headers = {
-        "Content-Type": "application/json",
-        "Authorization": f"Bearer {BLOB_READ_WRITE_TOKEN}",
-        "x-filename": f"{name}.json"
-    }
-
+    # JSONデータをUTF-8バイトにエンコード
+    json_data_bytes = json.dumps(data, ensure_ascii=False).encode('utf-8')
+    
+    # ファイル名をユニークにするために addRandomSuffix を使用
+    options = {"addRandomSuffix": "true"}
+    
     try:
-        response = requests.put(
-            url=blob_api_url,
-            headers=headers,
-            json=data
-        )
-        response.raise_for_status()
-        uploaded_blob = response.json()
-        print(f"✅ ペルソナ '{name}' をBlobに保存しました。URL: {uploaded_blob['url']}")
+        # vercel_blob.put() を使用してアップロード
+        # 第一引数にファイル名、第二引数にバイトデータを渡す
+        response = vercel_blob.put(f"{name}.json", json_data_bytes, options)
+        
+        # 応答の検証はライブラリが内部で行う
+        uploaded_url = response['url']
+        print(f"✅ ペルソナ '{name}' をBlobに保存しました。URL: {uploaded_url}")
         return name
-    except requests.exceptions.HTTPError as e:
-        print(f"❌ HTTPエラーが発生しました: {e.response.status_code}")
-        print("エラー本文:", e.response.text)
-        raise
-    except requests.exceptions.RequestException as e:
-        print(f"❌ リクエストエラーが発生しました: {e}")
-        raise
+        
     except Exception as e:
-        print(f"❌ 予期しないエラーが発生しました: {e}")
-        raise
+        print(f"❌ Blobへの保存中にエラーが発生しました: {e}")
+        raise Exception(f"Blobへの保存中にエラーが発生しました: {e}")
+
 
 def load_personalities_from_blob():
     """Blobからすべての人格を読み込む"""
     print("📥 Blobからデータをダウンロード中...")
     personalities = {}
-    if not BLOB_READ_WRITE_TOKEN:
-        print("Blobトークンが設定されていません。")
-        return {}
     
-    list_api_url = "https://blob.vercel-storage.com/"
-    
-    headers = {
-        "Authorization": f"Bearer {BLOB_READ_WRITE_TOKEN}"
-    }
-
+    # vercel_blob.list() を使用してファイルの一覧を取得
     try:
-        response = requests.get(list_api_url, headers=headers)
-        response.raise_for_status()
-        
-        files = response.json().get('blobs', [])
-        
+        # `vercel_blob` は環境変数を自動で読み込む
+        list_response = vercel_blob.list()
+        files = list_response.get('blobs', [])
+
         for file in files:
             if file['pathname'].endswith('.json'):
+                # `vercel_blob` には download_file があるが、ここでは直接URLにrequestsを使う
+                # requestsを使った既存のコードを流用
                 blob_url = file['url']
+                headers = {"Authorization": f"Bearer {BLOB_READ_WRITE_TOKEN}"}
                 file_response = requests.get(blob_url, headers=headers)
+                
                 if file_response.status_code == 200:
                     try:
                         data = file_response.json()
                         name = os.path.splitext(file['pathname'])[0]
-                        personalities[name] = data.get("system_instruction", "")
+                        
+                        # ランダムなサフィックスを削除
+                        clean_name = re.sub(r'_[a-f0-9]{8}$', '', name)
+                        personalities[clean_name] = data.get("system_instruction", "")
+                        
                     except json.JSONDecodeError:
                         print(f"❌ JSONデコードエラー: {file['pathname']}")
                         continue
         print("✅ Blobからペルソナを読み込みました。")
-    except requests.exceptions.HTTPError as e:
-        print(f"❌ Blobからの読み込み中にHTTPエラーが発生しました: {e.response.status_code}")
-        print("エラーレスポンス本文:", e.response.text)
-    except requests.exceptions.RequestException as e:
-        print(f"❌ Blobからの読み込み中にリクエストエラーが発生しました: {e}")
+    except Exception as e:
+        print(f"❌ Blobからの読み込み中にエラーが発生しました: {e}")
+        return {}
     return personalities
 
 def load_personalities():

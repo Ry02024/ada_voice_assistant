@@ -6,3 +6,4 @@ google-genai
 python-dotenv
 python-docx
 pypdf2
+vercel_blob
