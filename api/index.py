@@ -32,6 +32,13 @@ try:
     BLOB_READ_WRITE_TOKEN = os.environ.get('BLOB_READ_WRITE_TOKEN')
     VERCEL_PROJECT_ID = os.environ.get('VERCEL_PROJECT_ID')
 
+    # ↓↓↓ このあたりに追加してください ↓↓↓
+    print("---------------------------------")
+    print(f"BLOB_READ_WRITE_TOKEN が設定されています: {bool(BLOB_READ_WRITE_TOKEN)}")
+    print(f"VERCEL_PROJECT_ID が設定されています: {bool(VERCEL_PROJECT_ID)}")
+    print("---------------------------------")
+    # ↑↑↑ ここまで ↑↑↑
+
     # genai.Client 初期化
     genai_client = genai.Client(api_key=GOOGLE_API_KEY)
     print("Geminiクライアントを初期化しました。")
