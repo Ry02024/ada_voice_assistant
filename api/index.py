@@ -144,10 +144,7 @@ def save_personality_to_blob(text_content, user_defined_name=None):
     else:
         name = generate_personality_name(text_content).replace(" ", "_").replace("/", "_")
     
-    # データを辞書として定義
     data = {"system_instruction": text_content}
-    
-    # Vercel Blob APIのURLを構築
     blob_api_url = "https://blob.vercel-storage.com/"
     
     headers = {
@@ -157,23 +154,29 @@ def save_personality_to_blob(text_content, user_defined_name=None):
     }
 
     try:
-        # dataの代わりにjson引数を使用
+        # requests.putの呼び出しをtry...exceptで囲み、詳細なログを出力
         response = requests.put(
             url=blob_api_url,
             headers=headers,
-            json=data  # 👈 ここをjson引数に変更
+            json=data
         )
-        response.raise_for_status()
+        response.raise_for_status()  # 200番台以外のステータスコードで例外を発生
         uploaded_blob = response.json()
         print(f"✅ ペルソナ '{name}' をBlobに保存しました。URL: {uploaded_blob['url']}")
         return name
     except requests.exceptions.HTTPError as e:
-        print(f"❌ Blobへの保存中にHTTPエラーが発生しました: {e.response.status_code}")
-        print("エラーレスポンス本文:", e.response.text)
-        raise Exception(f"Blobへの保存中にHTTPエラーが発生しました: {e.response.status_code}")
+        # HTTPエラーの場合
+        print(f"❌ HTTPエラーが発生しました: {e.response.status_code}")
+        print("エラー本文:", e.response.text)
+        raise
     except requests.exceptions.RequestException as e:
-        print(f"❌ Blobへの保存中にリクエストエラーが発生しました: {e}")
-        raise Exception(f"Blobへの保存中にエラーが発生しました: {e}")
+        # その他のリクエストエラーの場合
+        print(f"❌ リクエストエラーが発生しました: {e}")
+        raise
+    except Exception as e:
+        # 予期しないエラーの場合
+        print(f"❌ 予期しないエラーが発生しました: {e}")
+        raise
 
 def load_personalities_from_blob():
     """Blobからすべての人格を読み込む"""
