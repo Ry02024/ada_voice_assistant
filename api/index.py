@@ -132,7 +132,7 @@ def generate_personality_name(text_content):
         return "新しいペルソナ"
 
 # --------------------------
-# Blob操作関数 (改善版)
+# Blob操作関数 (修正版)
 # --------------------------
 def save_personality_to_blob(text_content, user_defined_name=None):
     """人格設定をBlobにJSONとして保存する"""
@@ -144,23 +144,24 @@ def save_personality_to_blob(text_content, user_defined_name=None):
     else:
         name = generate_personality_name(text_content).replace(" ", "_").replace("/", "_")
     
+    # データを辞書として定義
     data = {"system_instruction": text_content}
     
     # Vercel Blob APIのURLを構築
-    blob_api_url = "https://blob.vercel-storage.com/" # PUT/POSTは新しいドメインを使用
+    blob_api_url = "https://blob.vercel-storage.com/"
     
-    # ファイル名をクエリパラメータとして追加
     headers = {
         "Content-Type": "application/json",
         "Authorization": f"Bearer {BLOB_READ_WRITE_TOKEN}",
-        "x-filename": f"{name}.json" # ファイル名をヘッダーで指定
+        "x-filename": f"{name}.json"
     }
 
     try:
+        # dataの代わりにjson引数を使用
         response = requests.put(
             url=blob_api_url,
             headers=headers,
-            data=json.dumps(data, ensure_ascii=False).encode('utf-8')
+            json=data  # 👈 ここをjson引数に変更
         )
         response.raise_for_status()
         uploaded_blob = response.json()
