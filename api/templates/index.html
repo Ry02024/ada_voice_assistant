@@ -188,6 +188,16 @@
         <input type="text" id="user-input" placeholder="メッセージを入力...">
         <button id="send-btn">送信</button>
         <div id="loading-spinner" class="spinner"></div>
+        <!-- ▼▼▼ ここから音声ON/OFFトグルスイッチを追記 ▼▼▼ -->
+        <div style="margin-left: 15px; display: flex; align-items: center; gap: 8px; color: #555;">
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5L6 9H2v6h4l5 4V5z"></path><path d="M15.54 8.46a5 5 0 0 1 0 7.07"></path></svg>
+            <label style="position: relative; display: inline-flex; items-center: center; cursor: pointer;">
+                <input type="checkbox" id="tts-toggle" style="position: absolute; width: 0; height: 0; opacity: 0;" checked>
+                <div style="width: 44px; height: 24px; background-color: #ccc; border-radius: 9999px; transition: background-color 0.2s;"></div>
+                <div id="tts-toggle-knob" style="position: absolute; top: 2px; left: 2px; width: 20px; height: 20px; background-color: white; border-radius: 50%; transition: transform 0.2s;"></div>
+            </label>
+        </div>
+        <!-- ▲▲▲ ここまで追記 ▲▲▲ -->
     </div>
 </div>
 
@@ -229,13 +239,27 @@
     const personaNameInput = document.getElementById('persona-name');
     const personaTextInput = document.getElementById('persona-text');
     const personaFileInput = document.getElementById('persona-file');
-    
+    // ▼▼▼ トグルスイッチ関連の要素を追加 ▼▼▼
+    const ttsToggle = document.getElementById('tts-toggle');
+    const ttsToggleKnob = document.getElementById('tts-toggle-knob');
+    const ttsToggleBg = ttsToggle.nextElementSibling;
+    // ▲▲▲ ここまで追加 ▲▲▲
     // UIを初期化
     async function initializeUI() {
         await loadPersonalities();
         addMessage('bot', '何か話しかけてください！');
     }
-
+    // ▼▼▼ トグルスイッチの見た目を更新する関数を追加 ▼▼▼
+    function updateToggleUI() {
+        if (ttsToggle.checked) {
+            ttsToggleBg.style.backgroundColor = '#4CAF50';
+            ttsToggleKnob.style.transform = 'translateX(20px)';
+        } else {
+            ttsToggleBg.style.backgroundColor = '#ccc';
+            ttsToggleKnob.style.transform = 'translateX(0px)';
+        }
+    }
+    // ▲▲▲ ここまで追加 ▲▲▲
     async function loadPersonalities() {
         try {
             const baseUrl = window.location.origin;
@@ -282,9 +306,12 @@
             const data = await response.json();
             if (response.ok) {
                 addMessage('bot', data.html);
-                if (data.plain) {
+                // ★★★ ここが重要な変更点 ★★★
+                // トグルがONの場合のみ、playAudioを呼び出す
+                if (ttsToggle.checked && data.plain) {
                     await playAudio(data.plain);
                 }
+                // ★★★ ここまで ★★★
             } else {
                 addMessage('bot', `エラー: ${data.error}`);
             }
@@ -396,7 +423,11 @@
         }
     });
     
+    // ▼▼▼ トグルスイッチ用のイベントリスナーを追加 ▼▼▼
+    ttsToggle.addEventListener('change', updateToggleUI);
+    // ▲▲▲ ここまで追加 ▲▲▲
     initializeUI();
+    updateToggleUI(); // ★★★ 初期表示のために呼び出しを追加 ★★★
 </script>
 
 </body>
