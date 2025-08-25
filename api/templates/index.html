@@ -1,434 +1,299 @@
 <!DOCTYPE html>
-<html lang="ja">
+<html lang="ja" class="dark">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI音声チャット</title>
+    <title>Interactive Persona Editor</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet">
+    
     <style>
-        body {
-            font-family: Arial, sans-serif;
-            margin: 0;
-            padding: 0;
-            background-color: #f0f2f5;
-            color: #333;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            min-height: 100vh;
-        }
-        .chat-container {
-            width: 100%;
-            max-width: 600px;
-            background-color: #fff;
-            border-radius: 8px;
-            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
-            overflow: hidden;
-            display: flex;
-            flex-direction: column;
-            height: 80vh;
-        }
-        header {
-            background-color: #4CAF50;
-            color: white;
-            padding: 15px;
-            text-align: center;
-            font-size: 1.2em;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-        .chat-box {
-            flex-grow: 1;
-            padding: 20px;
-            overflow-y: auto;
-            display: flex;
-            flex-direction: column;
-            gap: 15px;
-        }
-        .message {
-            max-width: 80%;
-            padding: 10px 15px;
-            border-radius: 20px;
-            word-wrap: break-word;
-        }
-        .message.user {
-            align-self: flex-end;
-            background-color: #dcf8c6;
-        }
-        .message.bot {
-            align-self: flex-start;
-            background-color: #e5e5ea;
-        }
-        .input-area {
-            display: flex;
-            padding: 15px;
-            border-top: 1px solid #ddd;
-        }
-        input[type="text"] {
-            flex-grow: 1;
-            padding: 10px;
-            border-radius: 20px;
-            border: 1px solid #ddd;
-            outline: none;
-        }
-        button {
-            background-color: #4CAF50;
-            color: white;
-            border: none;
-            padding: 10px 15px;
-            margin-left: 10px;
-            border-radius: 20px;
-            cursor: pointer;
-            outline: none;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            transition: background-color 0.3s;
-        }
-        button:hover {
-            background-color: #45a049;
-        }
-        button:disabled {
-            background-color: #ccc;
-            cursor: not-allowed;
-        }
-        .spinner {
-            border: 4px solid rgba(0, 0, 0, 0.1);
-            border-top: 4px solid #4CAF50;
-            border-radius: 50%;
-            width: 20px;
-            height: 20px;
-            animation: spin 1s linear infinite;
-            margin-left: 10px;
-            display: none;
-        }
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-        }
-        .persona-control {
-            display: flex;
-            gap: 10px;
-            align-items: center;
-        }
-        .persona-select {
-            padding: 8px;
-            border-radius: 5px;
-            border: 1px solid #ddd;
-        }
-        .add-persona-btn {
-            background-color: #2196F3;
-        }
-        .add-persona-btn:hover {
-            background-color: #1a71c2;
-        }
-
-        /* Modal Styles */
-        .modal {
-            display: none;
-            position: fixed;
-            z-index: 1;
-            left: 0;
-            top: 0;
-            width: 100%;
-            height: 100%;
-            overflow: auto;
-            background-color: rgba(0,0,0,0.4);
-            padding-top: 60px;
-        }
-        .modal-content {
-            background-color: #fefefe;
-            margin: 5% auto;
-            padding: 20px;
-            border: 1px solid #888;
-            width: 80%;
-            max-width: 500px;
-            border-radius: 8px;
-        }
-        .close {
-            color: #aaa;
-            float: right;
-            font-size: 28px;
-            font-weight: bold;
-        }
-        .close:hover,
-        .close:focus {
-            color: black;
-            text-decoration: none;
-            cursor: pointer;
-        }
-        .form-group {
-            margin-bottom: 15px;
-        }
-        .form-group label {
-            display: block;
-            margin-bottom: 5px;
-            font-weight: bold;
-        }
-        .form-group input, .form-group textarea {
-            width: 100%;
-            padding: 8px;
-            border: 1px solid #ddd;
-            border-radius: 5px;
-        }
+        body { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }
+        #chat-box { scrollbar-width: thin; }
+        #chat-box::-webkit-scrollbar { width: 8px; }
+        html:not(.dark) #chat-box { scrollbar-color: #d1d5db #f3f4f6; }
+        html:not(.dark) #chat-box::-webkit-scrollbar-track { background: #f3f4f6; }
+        html:not(.dark) #chat-box::-webkit-scrollbar-thumb { background-color: #d1d5db; border-radius: 10px; border: 2px solid #f3f4f6; }
+        .dark #chat-box { scrollbar-color: #4b5563 #1f2937; }
+        .dark #chat-box::-webkit-scrollbar-track { background: #1f2937; }
+        .dark #chat-box::-webkit-scrollbar-thumb { background-color: #4b5563; border-radius: 10px; border: 2px solid #1f2937; }
+        .message-bubble { padding: 12px 20px; border-radius: 20px; max-width: 75%; word-wrap: break-word; line-height: 1.6; }
+        .user-message { background-color: #4f46e5; color: white; align-self: flex-end; border-bottom-right-radius: 5px; }
+        .bot-message { background-color: #f3f4f6; color: #1f2937; align-self: flex-start; border-bottom-left-radius: 5px; display: flex; align-items: flex-start; gap: 12px; }
+        .dark .bot-message { background-color: #374151; color: #e5e7eb; }
+        .avatar { flex-shrink: 0; width: 36px; height: 36px; border-radius: 50%; background-color: #4f46e5; color: white; display: flex; align-items: center; justify-content: center; font-weight: bold; }
+        .loading-dots span { display: inline-block; width: 8px; height: 8px; border-radius: 50%; animation: bounce 1.4s infinite ease-in-out both; }
+        .loading-dots span { background-color: #9ca3af; }
+        .dark .loading-dots span { background-color: #6b7280; }
+        .loading-dots span:nth-child(1) { animation-delay: -0.32s; }
+        .loading-dots span:nth-child(2) { animation-delay: -0.16s; }
+        @keyframes bounce { 0%, 80%, 100% { transform: scale(0); } 40% { transform: scale(1.0); } }
     </style>
 </head>
-<body>
+<body class="font-[Noto Sans JP]">
 
-<div class="chat-container">
-    <header>
-        AI音声チャット
-        <div class="persona-control">
-            <select id="persona-select" class="persona-select"></select>
-            <button id="add-persona-btn" class="add-persona-btn">ペルソナ追加</button>
-        </div>
-    </header>
-    <div class="chat-box" id="chat-box"></div>
-    <div class="input-area">
-        <input type="text" id="user-input" placeholder="メッセージを入力...">
-        <button id="send-btn">送信</button>
-        <div id="loading-spinner" class="spinner"></div>
-        <!-- ▼▼▼ ここから音声ON/OFFトグルスイッチを追記 ▼▼▼ -->
-        <div style="margin-left: 15px; display: flex; align-items: center; gap: 8px; color: #555;">
-            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5L6 9H2v6h4l5 4V5z"></path><path d="M15.54 8.46a5 5 0 0 1 0 7.07"></path></svg>
-            <label style="position: relative; display: inline-flex; items-center: center; cursor: pointer;">
-                <input type="checkbox" id="tts-toggle" style="position: absolute; width: 0; height: 0; opacity: 0;" checked>
-                <div style="width: 44px; height: 24px; background-color: #ccc; border-radius: 9999px; transition: background-color 0.2s;"></div>
-                <div id="tts-toggle-knob" style="position: absolute; top: 2px; left: 2px; width: 20px; height: 20px; background-color: white; border-radius: 50%; transition: transform 0.2s;"></div>
-            </label>
-        </div>
-        <!-- ▲▲▲ ここまで追記 ▲▲▲ -->
+    <div class="bg-gray-100 dark:bg-gray-900 text-gray-800 dark:text-gray-200 flex flex-col h-screen w-full max-w-7xl mx-auto p-4 md:p-6 lg:p-8 transition-colors duration-300">
+        
+        <header class="flex-shrink-0 flex justify-between items-center mb-6">
+            <div>
+                <h1 class="text-2xl md:text-3xl font-bold text-gray-900 dark:text-white">Interactive Persona Editor</h1>
+                <p class="text-sm text-gray-500 dark:text-gray-400">AI-powered character creation studio.</p>
+            </div>
+            <div class="flex items-center space-x-2">
+                <button id="theme-toggle-btn" class="p-2 rounded-lg bg-gray-200 hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600 transition-colors">
+                    <svg id="theme-toggle-sun" class="w-5 h-5 text-gray-800 dark:text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707"></path><circle cx="12" cy="12" r="5"></circle></svg>
+                    <svg id="theme-toggle-moon" class="w-5 h-5 text-gray-800 dark:text-white hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"></path></svg>
+                </button>
+                <button id="editor-view-btn" class="bg-gray-200 hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-800 dark:text-white font-medium py-2 px-4 rounded-lg flex items-center space-x-2 transition-colors">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path></svg>
+                    <span>Editor</span>
+                </button>
+                <button id="chat-view-btn" class="bg-purple-600 hover:bg-purple-700 text-white font-medium py-2 px-4 rounded-lg flex items-center space-x-2 transition-colors">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"></path></svg>
+                    <span>Chat</span>
+                </button>
+            </div>
+        </header>
+
+        <main class="flex-grow bg-white dark:bg-gray-800 rounded-xl shadow-lg flex flex-col min-h-0 transition-colors duration-300">
+            <div id="chat-view" class="flex flex-col h-full">
+                <div class="flex-shrink-0 p-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
+                    <h2 class="text-xl font-semibold text-gray-900 dark:text-white">AI Chat</h2>
+                    <div class="flex items-center space-x-3">
+                        <select id="persona-select" class="bg-gray-200 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"></select>
+                        <select id="voice-select" class="bg-gray-200 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"></select>
+                    </div>
+                </div>
+                <div id="chat-box" class="flex-grow p-6 overflow-y-auto space-y-6"></div>
+                <div class="flex-shrink-0 p-4 border-t border-gray-200 dark:border-gray-700 flex items-center space-x-3">
+                    <input id="user-input" type="text" placeholder="AIにメッセージを送信..." class="w-full bg-gray-200 dark:bg-gray-700 text-gray-900 dark:text-gray-200 placeholder-gray-500 dark:placeholder-gray-400 border border-gray-300 dark:border-gray-600 rounded-lg p-3 focus:outline-none focus:ring-2 focus:ring-purple-500">
+                    
+                    <label for="tts-toggle" class="flex items-center cursor-pointer space-x-2 text-sm text-gray-600 dark:text-gray-400 flex-shrink-0">
+                        <span>Voice</span>
+                        <div class="relative">
+                            <input type="checkbox" id="tts-toggle" class="sr-only peer" checked>
+                            <div class="w-11 h-6 bg-gray-300 dark:bg-gray-600 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-white after:border-gray-300 dark:after:border-gray-500 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-purple-600"></div>
+                        </div>
+                    </label>
+
+                    <button id="send-btn" class="bg-purple-600 hover:bg-purple-700 text-white font-bold p-3 rounded-lg transition-colors disabled:bg-gray-500 dark:disabled:bg-gray-600 disabled:cursor-not-allowed flex-shrink-0">
+                        <svg class="w-6 h-6" fill="currentColor" viewBox="0 0 20 20"><path d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" fill-rule="evenodd"></path></svg>
+                    </button>
+                </div>
+            </div>
+            <div id="editor-view-content" class="hidden p-6">
+                <h2 class="text-2xl font-bold">Persona Editor</h2>
+                <p>This is where the persona editor will be implemented.</p>
+            </div>
+        </main>
     </div>
-</div>
 
-<!-- Modal for adding personality -->
-<div id="add-persona-modal" class="modal">
-    <div class="modal-content">
-        <span class="close">&times;</span>
-        <h2>新しいペルソナを追加</h2>
-        <form id="add-persona-form">
-            <div class="form-group">
-                <label for="persona-name">ペルソナ名 (任意)</label>
-                <!-- 修正: placeholderを追加 -->
-                <input type="text" id="persona-name" placeholder="例: 空欄の場合、Geminiが自動で命名します。">
+    <div id="add-persona-modal" class="hidden fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center p-4 z-50">
+        <div class="bg-white dark:bg-gray-800 rounded-lg shadow-xl w-full max-w-lg p-6 text-gray-900 dark:text-white border border-gray-300 dark:border-gray-700">
+            <div class="flex justify-between items-center mb-4">
+                <h2 class="text-xl font-bold">新しいペルソナを追加</h2>
+                <button class="text-gray-400 hover:text-white">&times;</button>
             </div>
-            <div class="form-group">
-                <label for="persona-text">ペルソナ設定テキスト</label>
-                <textarea id="persona-text" rows="5" placeholder="例: あなたは歴史の専門家です。"></textarea>
-            </div>
-            <div style="text-align: center; margin: 15px 0;">または</div>
-            <div class="form-group">
-                <label for="persona-file">ファイルからアップロード (txt, docx, pdf, csv)</label>
-                <input type="file" id="persona-file">
-            </div>
-            <button type="submit">保存</button>
-        </form>
+            <form id="add-persona-form">
+                <div class="space-y-4">
+                    <div><label for="persona-name" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">ペルソナ名 (任意)</label><input type="text" id="persona-name" name="name" placeholder="例: 空欄の場合、Geminiが自動で命名" class="w-full bg-gray-100 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg p-2 focus:outline-none focus:ring-2 focus:ring-blue-500"></div>
+                    <div><label for="persona-text" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">ペルソナ設定テキスト</label><textarea id="persona-text" name="text_content" rows="5" placeholder="例: あなたは歴史の専門家です..." class="w-full bg-gray-100 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg p-2 focus:outline-none focus:ring-2 focus:ring-blue-500"></textarea></div>
+                    <div class="text-center text-gray-500 dark:text-gray-400">または</div>
+                    <div><label for="persona-file" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">ファイルからアップロード (.txt, .docx, .pdf, .csv)</label><input type="file" id="persona-file" name="file" class="w-full text-sm text-gray-500 dark:text-gray-400 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-blue-600 file:text-white hover:file:bg-blue-700"></div>
+                </div>
+                <div class="mt-6"><button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg transition-colors">保存</button></div>
+            </form>
+        </div>
     </div>
-</div>
+    
+    <script>
+    document.addEventListener('DOMContentLoaded', () => {
+        const themeToggleBtn = document.getElementById('theme-toggle-btn');
+        const sunIcon = document.getElementById('theme-toggle-sun');
+        const moonIcon = document.getElementById('theme-toggle-moon');
+        const chatBox = document.getElementById('chat-box');
+        const userInput = document.getElementById('user-input');
+        const sendBtn = document.getElementById('send-btn');
+        const personaSelect = document.getElementById('persona-select');
+        const voiceSelect = document.getElementById('voice-select');
+        const ttsToggle = document.getElementById('tts-toggle');
+        const addPersonaModal = document.getElementById('add-persona-modal');
+        const closeModalBtn = addPersonaModal.querySelector('button.text-gray-400');
+        const addPersonaForm = document.getElementById('add-persona-form');
+        let currentAudio = null;
 
-<script>
-    const chatBox = document.getElementById('chat-box');
-    const userInput = document.getElementById('user-input');
-    const sendBtn = document.getElementById('send-btn');
-    const loadingSpinner = document.getElementById('loading-spinner');
-    const personaSelect = document.getElementById('persona-select');
-    const addPersonaBtn = document.getElementById('add-persona-btn');
-    const addPersonaModal = document.getElementById('add-persona-modal');
-    const closeModalBtn = document.querySelector('.modal .close');
-    const addPersonaForm = document.getElementById('add-persona-form');
-    const personaNameInput = document.getElementById('persona-name');
-    const personaTextInput = document.getElementById('persona-text');
-    const personaFileInput = document.getElementById('persona-file');
-    // ▼▼▼ トグルスイッチ関連の要素を追加 ▼▼▼
-    const ttsToggle = document.getElementById('tts-toggle');
-    const ttsToggleKnob = document.getElementById('tts-toggle-knob');
-    const ttsToggleBg = ttsToggle.nextElementSibling;
-    // ▲▲▲ ここまで追加 ▲▲▲
-    // UIを初期化
-    async function initializeUI() {
-        await loadPersonalities();
-        addMessage('bot', '何か話しかけてください！');
-    }
-    // ▼▼▼ トグルスイッチの見た目を更新する関数を追加 ▼▼▼
-    function updateToggleUI() {
-        if (ttsToggle.checked) {
-            ttsToggleBg.style.backgroundColor = '#4CAF50';
-            ttsToggleKnob.style.transform = 'translateX(20px)';
-        } else {
-            ttsToggleBg.style.backgroundColor = '#ccc';
-            ttsToggleKnob.style.transform = 'translateX(0px)';
+        const applyTheme = (isDark) => {
+            if (isDark) { document.documentElement.classList.add('dark'); sunIcon.classList.remove('hidden'); moonIcon.classList.add('hidden');
+            } else { document.documentElement.classList.remove('dark'); sunIcon.classList.add('hidden'); moonIcon.classList.remove('hidden'); }
+        };
+        const toggleTheme = () => {
+            const isDark = document.documentElement.classList.toggle('dark');
+            localStorage.setItem('theme', isDark ? 'dark' : 'light');
+            applyTheme(isDark);
+        };
+        async function initializeUI() {
+            await loadPersonalities();
+            loadVoices();
+            addMessage('bot', 'こんにちは！何かお話しましょう。');
         }
-    }
-    // ▲▲▲ ここまで追加 ▲▲▲
-    async function loadPersonalities() {
-        try {
-            const baseUrl = window.location.origin;
-            const response = await fetch(`${baseUrl}/api/personalities`);
-            const data = await response.json();
-            const personalities = data.personalities;
-
-            personaSelect.innerHTML = '';
-            
-            const defaultOption = document.createElement('option');
-            defaultOption.value = 'デフォルト';
-            defaultOption.textContent = 'デフォルト';
-            personaSelect.appendChild(defaultOption);
-
-            personalities.forEach(p => {
+        async function loadPersonalities() {
+            try {
+                const response = await fetch('/api/personalities');
+                const data = await response.json();
+                personaSelect.innerHTML = '';
+                const defaultOption = document.createElement('option');
+                defaultOption.value = 'Default Assistant';
+                defaultOption.textContent = 'Default Assistant';
+                personaSelect.appendChild(defaultOption);
+                data.personalities.forEach(p => {
+                    const option = document.createElement('option');
+                    option.value = p; option.textContent = p;
+                    personaSelect.appendChild(option);
+                });
+                const separator = document.createElement('option');
+                separator.disabled = true; separator.textContent = '──────────';
+                personaSelect.appendChild(separator);
+                const addOption = document.createElement('option');
+                addOption.value = 'add_new_persona';
+                addOption.textContent = '＋ New Persona';
+                personaSelect.appendChild(addOption);
+            } catch (error) { console.error('Error loading personalities:', error); }
+        }
+        function loadVoices() {
+            voiceSelect.innerHTML = '';
+            // This is a placeholder. In the future, you can fetch voices from an API.
+            const availableVoices = [ { id: 'ada_voice', name: 'Ada (Default)' } ];
+            availableVoices.forEach(v => {
                 const option = document.createElement('option');
-                option.value = p;
-                option.textContent = p;
-                personaSelect.appendChild(option);
+                option.value = v.id;
+                option.textContent = v.name;
+                voiceSelect.appendChild(option);
             });
-        } catch (error) {
-            console.error('ペルソナの読み込みエラー:', error);
+            const separator = document.createElement('option');
+            separator.disabled = true; separator.textContent = '──────────';
+            voiceSelect.appendChild(separator);
+            const addOption = document.createElement('option');
+            addOption.value = 'add_new_voice';
+            addOption.textContent = '＋ New Voice';
+            voiceSelect.appendChild(addOption);
         }
-    }
-
-    async function sendMessage() {
-        const prompt = userInput.value.trim();
-        if (!prompt) return;
-
-        const selectedPersonality = personaSelect.value;
-        addMessage('user', prompt);
-        userInput.value = '';
-        sendBtn.disabled = true;
-        loadingSpinner.style.display = 'block';
-
-        try {
-            const baseUrl = window.location.origin;
-            const response = await fetch(`${baseUrl}/api/chat`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ prompt: prompt, personality: selectedPersonality })
-            });
-
-            const data = await response.json();
-            if (response.ok) {
-                addMessage('bot', data.html);
-                // ★★★ ここが重要な変更点 ★★★
-                // トグルがONの場合のみ、playAudioを呼び出す
+        async function sendMessage() {
+            const prompt = userInput.value.trim();
+            if (!prompt) return;
+            const selectedPersonality = personaSelect.value;
+            addMessage('user', prompt);
+            userInput.value = '';
+            toggleSendButton(false);
+            const loadingBubble = addMessage('bot', null, true);
+            try {
+                const response = await fetch('/api/chat', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ prompt, personality: selectedPersonality })
+                });
+                if (!response.ok) throw new Error(`Server error: ${response.statusText}`);
+                const data = await response.json();
+                if (loadingBubble) { loadingBubble.innerHTML = data.html;
+                } else { addMessage('bot', data.html); }
                 if (ttsToggle.checked && data.plain) {
                     await playAudio(data.plain);
                 }
-                // ★★★ ここまで ★★★
-            } else {
-                addMessage('bot', `エラー: ${data.error}`);
+            } catch (error) {
+                console.error('Error:', error);
+                const errorText = `<p class="text-red-400">申し訳ありません、エラーが発生しました。</p>`;
+                if (loadingBubble) { loadingBubble.innerHTML = errorText;
+                } else { addMessage('bot', errorText); }
+            } finally { 
+                toggleSendButton(true);
+                chatBox.scrollTop = chatBox.scrollHeight;
             }
-        } catch (error) {
-            addMessage('bot', '通信エラーが発生しました。');
-        } finally {
-            sendBtn.disabled = false;
-            loadingSpinner.style.display = 'none';
+        }
+        function addMessage(sender, content, isLoading = false) {
+            const messageContainer = document.createElement('div');
+            messageContainer.className = `flex w-full ${sender === 'user' ? 'justify-end' : 'justify-start'}`;
+            let messageBubble;
+            if (sender === 'bot') {
+                const avatar = document.createElement('div');
+                avatar.className = 'avatar'; avatar.textContent = 'A';
+                messageBubble = document.createElement('div');
+                messageBubble.className = 'message-bubble bot-message';
+                if (isLoading) { messageBubble.innerHTML = `<div class="loading-dots"><span></span><span></span><span></span></div>`;
+                } else { messageBubble.innerHTML = content; }
+                messageContainer.appendChild(avatar);
+                messageContainer.appendChild(messageBubble);
+            } else {
+                messageBubble = document.createElement('div');
+                messageBubble.className = 'message-bubble user-message';
+                messageBubble.textContent = content;
+                messageContainer.appendChild(messageBubble);
+            }
+            chatBox.appendChild(messageContainer);
             chatBox.scrollTop = chatBox.scrollHeight;
+            return messageBubble;
         }
-    }
+        function toggleSendButton(enabled) { sendBtn.disabled = !enabled; }
+        async function playAudio(text) {
+            if (currentAudio) { currentAudio.pause(); }
+            const selectedVoiceId = voiceSelect.value;
+            try {
+                const audioResponse = await fetch('/api/tts', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ text, voice_id: selectedVoiceId })
+                });
+                if (audioResponse.ok) {
+                    const audioBlob = await audioResponse.blob();
+                    const audioUrl = URL.createObjectURL(audioBlob);
+                    currentAudio = new Audio(audioUrl);
+                    currentAudio.play();
+                } else { console.error('Error generating audio:', await audioResponse.text()); }
+            } catch (error) { console.error('Error playing audio:', error); }
+        }
+        async function handleAddPersona(e) {
+            e.preventDefault();
+            const formData = new FormData(addPersonaForm);
+            try {
+                const response = await fetch('/api/personalities/add', {
+                    method: 'POST',
+                    body: formData
+                });
+                const data = await response.json();
+                alert(data.message || data.error);
+                if (response.ok) {
+                    addPersonaModal.classList.add('hidden');
+                    addPersonaForm.reset();
+                    await loadPersonalities();
+                }
+            } catch (error) { alert('ペルソナの追加中にエラーが発生しました。'); }
+        }
 
-    function addMessage(sender, content) {
-        const messageDiv = document.createElement('div');
-        messageDiv.classList.add('message', sender);
-        messageDiv.innerHTML = content;
-        chatBox.appendChild(messageDiv);
-        chatBox.scrollTop = chatBox.scrollHeight;
-    }
-
-    async function playAudio(text) {
-        try {
-            const baseUrl = window.location.origin;
-            const audioResponse = await fetch(`${baseUrl}/api/tts`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ text: text })
-            });
-            
-            if (audioResponse.ok) {
-                const audioBlob = await audioResponse.blob();
-                const audioUrl = URL.createObjectURL(audioBlob);
-                const audio = new Audio(audioUrl);
-                audio.play();
-            } else {
-                console.error('音声生成エラー:', audioResponse.statusText);
+        themeToggleBtn.addEventListener('click', toggleTheme);
+        sendBtn.addEventListener('click', sendMessage);
+        userInput.addEventListener('keypress', (e) => { if (e.key === 'Enter' && !sendBtn.disabled) sendMessage(); });
+        closeModalBtn.addEventListener('click', () => addPersonaModal.classList.add('hidden'));
+        addPersonaModal.addEventListener('click', (e) => { if (e.target === addPersonaModal) addPersonaModal.classList.add('hidden'); });
+        addPersonaForm.addEventListener('submit', handleAddPersona);
+        personaSelect.addEventListener('change', (e) => {
+            if (e.target.value === 'add_new_persona') {
+                addPersonaModal.classList.remove('hidden');
+                e.target.value = 'Default Assistant';
             }
-        } catch (error) {
-            console.error('音声再生エラー:', error);
-        }
-    }
-
-    // イベントリスナー
-    sendBtn.addEventListener('click', sendMessage);
-    userInput.addEventListener('keypress', (e) => {
-        if (e.key === 'Enter') {
-            sendMessage();
-        }
-    });
-
-    addPersonaBtn.addEventListener('click', () => {
-        addPersonaModal.style.display = 'block';
-    });
-
-    closeModalBtn.addEventListener('click', () => {
-        addPersonaModal.style.display = 'none';
-    });
-
-    window.addEventListener('click', (e) => {
-        if (e.target == addPersonaModal) {
-            addPersonaModal.style.display = 'none';
-        }
-    });
-
-    addPersonaForm.addEventListener('submit', async (e) => {
-        e.preventDefault();
-
-        const formData = new FormData();
-        const name = personaNameInput.value.trim();
-        const text = personaTextInput.value.trim();
-        const file = personaFileInput.files[0];
-
-        if (!text && !file) {
-            alert('ペルソナ設定テキストまたはファイルをアップロードしてください。');
-            return;
-        }
-
-        if (name) {
-            formData.append('name', name);
-        }
-
-        if (text) {
-            formData.append('text_content', text);
-        }
+        });
+        voiceSelect.addEventListener('change', (e) => {
+            if (e.target.value === 'add_new_voice') {
+                alert('ボイス追加機能は現在開発中です。');
+                voiceSelect.selectedIndex = 0;
+            }
+        });
         
-        if (file) {
-            formData.append('file', file);
-        }
-
-        try {
-            const baseUrl = window.location.origin;
-            const response = await fetch(`${baseUrl}/api/personalities/add`, {
-                method: 'POST',
-                body: formData
-            });
-
-            const data = await response.json();
-            alert(data.message || data.error);
-            
-            if (response.ok) {
-                addPersonaModal.style.display = 'none';
-                personaNameInput.value = '';
-                personaTextInput.value = '';
-                personaFileInput.value = '';
-                await loadPersonalities();
-            }
-        } catch (error) {
-            alert('ペルソナの追加中にエラーが発生しました。');
-        }
+        const savedTheme = localStorage.getItem('theme');
+        const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+        applyTheme(savedTheme === 'dark' || (!savedTheme && prefersDark));
+        initializeUI();
     });
-    
-    // ▼▼▼ トグルスイッチ用のイベントリスナーを追加 ▼▼▼
-    ttsToggle.addEventListener('change', updateToggleUI);
-    // ▲▲▲ ここまで追加 ▲▲▲
-    initializeUI();
-    updateToggleUI(); // ★★★ 初期表示のために呼び出しを追加 ★★★
-</script>
+    </script>
 
 </body>
 </html>
