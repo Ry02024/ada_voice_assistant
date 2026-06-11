@@ -405,15 +405,51 @@ def list_personalities():
         print(f"❌ ペルソナ一覧取得エラー: {e}")
         return jsonify({"personalities": []}), 500
 
+def update_personality_local(name, text_content):
+    personalities_dir = 'personalities'
+    if not os.path.exists(personalities_dir):
+        os.makedirs(personalities_dir)
+
+    file_path = os.path.join(personalities_dir, f"{name}.json")
+    if not os.path.exists(file_path):
+        raise FileNotFoundError(f"ペルソナ '{name}' が見つかりません。")
+
+    data = {"system_instruction": text_content}
+    with open(file_path, 'w', encoding='utf-8') as f:
+        json.dump(data, f, ensure_ascii=False, indent=4)
+
+    return name
+    
 @app.route("/api/personalities/update", methods=['POST'])
 def update_personality():
     """既存のペルソナを更新する"""
     print("🔄 /api/personalities/update がリクエストされました。")
-    
+
     d = request.get_json(force=True, silent=True) or {}
     name = d.get("name", "").strip()
     text_content = d.get("text_content", "").strip()
-    
+
+    if not name:
+        return jsonify({"error": "name が空です。"}), 400
+
+    if not text_content:
+        return jsonify({"error": "text_content が空です。"}), 400
+
+    personalities = load_personalities()
+    if name not in personalities:
+        return jsonify({"error": f"ペルソナ '{name}' が見つかりません。"}), 404
+
+    try:
+        update_personality_local(name, text_content)
+        return jsonify({
+            "message": f"ペルソナ '{name}' を更新しました。",
+            "name": name
+        }), 200
+    except FileNotFoundError as e:
+        return jsonify({"error": str(e)}), 404
+    except Exception as e:
+        print(f"❌ ペルソナ更新エラー: {e}")
+        return jsonify({"error": f"更新中にエラーが発生しました: {e}"}), 500    
 
 @app.route("/api/chat", methods=['POST'])
 def api_chat():
