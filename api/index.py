@@ -34,12 +34,13 @@ try:
     FISH_AUDIO_VOICE_ID = os.environ.get('FISH_AUDIO_VOICE_ID')
     BLOB_READ_WRITE_TOKEN = os.environ.get('BLOB_READ_WRITE_TOKEN')
     VERCEL_PROJECT_ID = os.environ.get('VERCEL_PROJECT_ID')
+    GEMINI_MODEL = os.environ.get('GEMINI_MODEL', 'gemini-3.5-flash')
 
-    # Vercel Blob と Gemini API の利用可能性を確認
     print("---------------------------------")
     print(f"BLOB_READ_WRITE_TOKEN が設定されています: {bool(BLOB_READ_WRITE_TOKEN)}")
     print(f"VERCEL_PROJECT_ID が設定されています: {bool(VERCEL_PROJECT_ID)}")
     print(f"GOOGLE_API_KEY が設定されています: {bool(GOOGLE_API_KEY)}")
+    print(f"GEMINI_MODEL: {GEMINI_MODEL}")
     print("---------------------------------")
 
     # genai.Client 初期化 (APIキーがある場合のみ)
@@ -149,7 +150,7 @@ def generate_personality_name(text_content):
 """
     try:
         response = genai_client.models.generate_content(
-            model="gemini-2.5-flash-lite-preview-06-17", # または他の適切なモデル
+            model=GEMINI_MODEL, # または他の適切なモデル
             contents=prompt_text
         )
         # response.text が存在しない場合のフォールバック
