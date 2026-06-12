@@ -479,7 +479,7 @@ def api_chat():
     try:
         # Gemini API にリクエストを送信
         response = genai_client.models.generate_content(
-            model="gemini-2.5-flash-lite-preview-06-17", # 使用するモデルを指定
+            model= GEMINI_MODEL, # 使用するモデルを指定
             contents=full_prompt
         )
         # 応答テキストを取得 (response.text が存在しない場合のフォールバック)
